@@ -3,12 +3,14 @@
 cmake_minimum_required(VERSION 3.10)
 project(MangaClash CXX C OBJC OBJCXX)
 
+cmake_policy(SET CMP0077 NEW)   # BUILD_* options set below must be honored by cocos' option()
 set(CMAKE_CXX_STANDARD 14)
 set(COCOS2DX_ROOT "" CACHE PATH "Cocos2d-x 3.17.1 root (with external/ downloaded via download-deps.py)")
 if(NOT COCOS2DX_ROOT)
   message(FATAL_ERROR "Set -DCOCOS2DX_ROOT=<path to cocos2d-x-3.17.1>")
 endif()
 
+set(COCOS2DX_ROOT_PATH ${COCOS2DX_ROOT})
 set(CMAKE_MODULE_PATH ${COCOS2DX_ROOT}/cmake/Modules/)
 set(BUILD_LUA_LIBS OFF)
 set(BUILD_JS_LIBS OFF)
