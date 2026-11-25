@@ -91,6 +91,7 @@ void worker(Host* h) {
             if (!base.empty()) break;
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
         }
+        if (base.empty()) rlog("[dl] no cdn address yet, giving up %s", t.file.c_str());
         bool ok = false;
         long len = 0;
         int ret = 1;
@@ -171,6 +172,7 @@ int setPlatAndResURL(lua_State* L) {
     std::string cdn = lua_isstring(L, 3) ? lua_tostring(L, 3) : "";
     if (cdn == "nil") cdn.clear();
     Host* h = &H(L);
+    rlog("[res] SetPlatAndResURL plat=%s cdn=%s", plat.c_str(), cdn.c_str());
     if (!cdn.empty()) { h->spawn([h, cdn]() { useCdn(h, cdn); }); return 0; }
     if (plat.empty()) return 0;
     std::string lang = "vn";
