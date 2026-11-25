@@ -70,6 +70,7 @@ bool AppDelegate::applicationDidFinishLaunching() {
     if (!host_->loadConfig(dir + "/../config.cnf", err)) { mc::rlog("[boot] FAIL config: %s", err.c_str()); return false; }
     if (!host_->boot(err)) { mc::rlog("[boot] FAIL main(): %s", err.c_str()); return false; }
     mc::rlog("[boot] main() ok");
+    if (!url.empty()) mc::startCdn(host_.get(), url);
     director->getScheduler()->schedule([this](float dt) {
         std::string e;
         static int frame = 0;

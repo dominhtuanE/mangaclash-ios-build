@@ -257,6 +257,11 @@ int cancelUpdateFileList(lua_State*) { return 0; }
 
 }  // namespace
 
+void startCdn(Host* h, const std::string& cdn) {          // boot fallback: Lua may never call SetPlatAndResURL
+    rlog("[res] startCdn %s", cdn.c_str());
+    h->spawn([h, cdn]() { useCdn(h, cdn); });
+}
+
 void fillResManager(lua_State* L) {                       // GameLib on top of the stack
     lua_getfield(L, -1, "ResManager");
     struct R { const char* n; lua_CFunction f; };
