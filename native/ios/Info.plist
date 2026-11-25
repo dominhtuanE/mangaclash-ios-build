@@ -4,10 +4,10 @@
 <dict>
   <key>CFBundleDevelopmentRegion</key><string>en</string>
   <key>CFBundleDisplayName</key><string>MangaClash</string>
-  <key>CFBundleExecutable</key><string>${EXECUTABLE_NAME}</string>
-  <key>CFBundleIdentifier</key><string>${PRODUCT_BUNDLE_IDENTIFIER}</string>
+  <key>CFBundleExecutable</key><string>MangaClash</string>
+  <key>CFBundleIdentifier</key><string>com.emti.mangaclash</string>
   <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
-  <key>CFBundleName</key><string>${PRODUCT_NAME}</string>
+  <key>CFBundleName</key><string>MangaClash</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>2.20.141113</string>
   <key>CFBundleVersion</key><string>1</string>
