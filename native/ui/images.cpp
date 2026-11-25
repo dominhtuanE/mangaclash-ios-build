@@ -211,7 +211,7 @@ void registerImages(lua_State* L) {
     luaL_getmetatable(L, kNodeMeta);
     struct R { const char* n; lua_CFunction f; };
     static const R regs[] = {
-        {"SetImage", setImage}, {"SetImageData", setImage}, {"StretchTo", stretchTo}, {"SetInnerRect", setInnerRect},
+        {"SetImage", setImage}, {"SetImageData", setImage}, {"StretchTo", stretchTo}, {"SetStretchSize", stretchTo}, {"SetInnerRect", setInnerRect},
         {"SetFlipX", setFlipX}, {"SetColor", setNodeColor}, {"GetWidth", getWidth}, {"GetHeight", getHeight},
     };
     for (const R& r : regs) { lua_pushcfunction(L, r.f); lua_setfield(L, -2, r.n); }
