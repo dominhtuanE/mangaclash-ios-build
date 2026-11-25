@@ -73,6 +73,8 @@ Host::Host() {
     int n = static_cast<int>(lua_objlen(L_, -1));
     lua_pushcfunction(L_, bundleLoader);
     lua_rawseti(L_, -2, n + 1);
+    lua_pushcfunction(L_, resourceLoader);
+    lua_rawseti(L_, -2, n + 2);
     lua_pop(L_, 2);
 }
 
