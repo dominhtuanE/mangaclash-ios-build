@@ -1,7 +1,9 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
+#include <cctype>
 #include <string>
+#include <vector>
 
 #include "host.h"
 #include "rlog.h"
@@ -117,6 +119,63 @@ int gameMd5(lua_State* L) {
     return 1;
 }
 
+
+// ---- batch of small natives (text length, url encode, push/voice stubs)
+std::vector<std::string> utf8Chars(const std::string& s) {
+    std::vector<std::string> v;
+    for (size_t i = 0; i < s.size();) {
+        unsigned char c = static_cast<unsigned char>(s[i]);
+        size_t n = c < 0x80 ? 1 : (c >> 5) == 6 ? 2 : (c >> 4) == 14 ? 3 : (c >> 3) == 30 ? 4 : 1;
+        v.push_back(s.substr(i, n));
+        i += n;
+    }
+    return v;
+}
+int scLength(lua_State* L) { lua_pushnumber(L, static_cast<lua_Number>(utf8Chars(luaL_optstring(L, 1, "")).size())); return 1; }
+int scAt(lua_State* L) {                                  // unicode_at(str, index0) -> code point
+    auto v = utf8Chars(luaL_optstring(L, 1, ""));
+    size_t i = static_cast<size_t>(luaL_optnumber(L, 2, 0));
+    uint32_t cp = 0;
+    if (i < v.size()) {
+        const std::string& c = v[i];
+        unsigned char b = static_cast<unsigned char>(c[0]);
+        if (c.size() == 1) cp = b;
+        else if (c.size() == 2) cp = ((b & 0x1f) << 6) | (c[1] & 0x3f);
+        else if (c.size() == 3) cp = ((b & 0x0f) << 12) | ((c[1] & 0x3f) << 6) | (c[2] & 0x3f);
+        else cp = ((b & 0x07) << 18) | ((c[1] & 0x3f) << 12) | ((c[2] & 0x3f) << 6) | (c[3] & 0x3f);
+    }
+    lua_pushnumber(L, cp);
+    return 1;
+}
+int scSub(lua_State* L) {                                 // unicode_sub(str, start0, count)
+    auto v = utf8Chars(luaL_optstring(L, 1, ""));
+    size_t a = static_cast<size_t>(luaL_optnumber(L, 2, 0)), n = static_cast<size_t>(luaL_optnumber(L, 3, 1 << 20));
+    std::string out;
+    for (size_t i = a; i < v.size() && i < a + n; ++i) out += v[i];
+    lua_pushstring(L, out.c_str());
+    return 1;
+}
+int gameUrlEncode(lua_State* L) {
+    static const char* hex = "0123456789ABCDEF";
+    std::string o;
+    for (unsigned char c : std::string(luaL_optstring(L, 1, ""))) {
+        if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') o += static_cast<char>(c);
+        else { o += '%'; o += hex[c >> 4]; o += hex[c & 15]; }
+    }
+    lua_pushstring(L, o.c_str());
+    return 1;
+}
+int retArg2(lua_State* L) { lua_pushvalue(L, 2); return 1; }          // method call: self, value -> value
+int retLang(lua_State* L) { lua_pushstring(L, "vn"); return 1; }
+
+// add functions to an existing global class table (creating it when absent)
+void ext(lua_State* L, const char* cls, std::initializer_list<std::pair<const char*, lua_CFunction>> fns) {
+    lua_getglobal(L, cls);
+    if (!lua_istable(L, -1)) { lua_pop(L, 1); lua_newtable(L); markMissingTable(L, cls); lua_pushvalue(L, -1); lua_setglobal(L, cls); }
+    for (auto& p : fns) { lua_pushcfunction(L, p.second); lua_setfield(L, -2, p.first); }
+    lua_pop(L, 1);
+}
+
 int gameRand(lua_State* L) {              // Rand(n) -> [1,n]; Rand(a,b) -> [a,b]; Rand() -> [0,1)
     g_seed = g_seed * 1664525u + 1013904223u;
     double r = (g_seed >> 8) / 16777216.0;
@@ -167,8 +226,8 @@ void registerCore(Host& h) {
                         {"IsYingYongBao", retFalse}, {"GetCampuuidInfo", retEmptyStr}, {"GetPhpUserInfoUrl", retEmptyStr},
                         {"GetUserCenterStr", retEmptyStr}, {"GetLogoImagePath", retEmptyStr}, {"GetLoginImagePath", retEmptyStr}, {"SetLuaLoginCallback", ret0}, {"ReportOpenChargePanel", ret0}, {"ReSaveSdkCallbackInfo", ret0}});
     sub(L, "GameEngine", {{"GetNowTime", nowMsEpoch}, {"GetTimeTicket", nowSecEpoch}, {"CloseApp", ret0}});
-    sub(L, "MsgPush", {{"StartMsgPush", ret0}});
-    sub(L, "FaceConvHelper", {{"registerFace", ret0}});
+    sub(L, "MsgPush", {{"StartMsgPush", ret0}, {"SetTimerTask", ret0}, {"CancelTimerTask", ret0}, {"DelegateSocket", ret0}, {"SetAlias", ret0}});
+    sub(L, "FaceConvHelper", {{"registerFace", ret0}, {"convertToFaceStr", retArg2}});
     for (const char* t : {"NodeUnity", "ActionManager", "UIListViewEx", "UIPageViewEx",
                           "UIScrollViewEx", "ExtraComponet", "MessageMem"})
         sub(L, t, {});
@@ -188,6 +247,7 @@ void registerCore(Host& h) {
     fn(L, "GetCocosVersion", getCocosVersion);
     fn(L, "Rand", gameRand);
     fn(L, "Md5", gameMd5);
+    fn(L, "UrlEncode", gameUrlEncode);
     fn(L, "COCOLog", cocosLog);
     fillResManager(L);
     lua_setglobal(L, "GameLib");
@@ -202,6 +262,22 @@ void registerCore(Host& h) {
         markMissingTable(L, cls);
         lua_setglobal(L, cls);
     }
+    ext(L, "StringConvHelper", {{"unicode_length", scLength}, {"unicode_at", scAt}, {"unicode_sub", scSub}});
+    ext(L, "MsgPush", {{"SetTimerTask", ret0}, {"CancelTimerTask", ret0}, {"DelegateSocket", ret0}, {"SetAlias", ret0}, {"StartMsgPush", ret0}});
+    ext(L, "FaceConvHelper", {{"convertToFaceStr", retArg2}, {"registerFace", ret0}});
+    ext(L, "VoiceManager", {{"SaveMsgAsFile", ret0}, {"StartRecord", ret0}, {"StopRecord", ret0}, {"StartPlay", ret0}, {"StopPlay", ret0},
+                            {"DeleteFileByVoiceId", ret0}, {"ReleaseVoice", ret0}});
+    ext(L, "SkeletonDataCahce", {{"AddSsdzSkeletonDataAsync", ret0}, {"AddSkeletonDataAsync", ret0}, {"LoadSsdzSkeletonData", ret0},
+                                 {"IsSkeletonDataInCache", retFalse}, {"IsSSdzDataInCache", retFalse}});
+    ext(L, "RichText", {{"SetNewlineChar", ret0}});
+    ext(L, "FontLabel", {{"SetStrokeOpt", ret0}});
+    ext(L, "EngineAdapter", {{"GetLanguage", retLang}});
+    ext(L, "Location", {{"StartLocation", ret0}, {"StopLocation", ret0}});
+    ext(L, "UIScrollViewEx", {});
+    lua_getglobal(L, "UIScrollViewEx");                    // constants (cocos ui::ScrollView::Direction: VERTICAL=1, HORIZONTAL=2)
+    lua_pushnumber(L, 1); lua_setfield(L, -2, "ScrollDirVertical");
+    lua_pushnumber(L, 2); lua_setfield(L, -2, "ScrollDirHorizontal");
+    lua_pop(L, 1);
     lua_newtable(L);
     lua_setglobal(L, "GameConfig");
     lua_pushcfunction(L, cocosSize);

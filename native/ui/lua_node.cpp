@@ -149,6 +149,8 @@ int nodeMissingIndex(lua_State* L) {
     return 1;
 }
 int SetContentSize(lua_State* L) { self(L)->setContentSize(Size(static_cast<float>(luaL_checknumber(L, 2)), static_cast<float>(luaL_checknumber(L, 3)))); return 0; }
+int GetContentWidth(lua_State* L) { lua_pushnumber(L, self(L)->getContentSize().width); return 1; }
+int GetContentHeight(lua_State* L) { lua_pushnumber(L, self(L)->getContentSize().height); return 1; }
 int SetTag(lua_State* L) { self(L)->setTag(static_cast<int>(luaL_checknumber(L, 2))); return 0; }
 int GetTag(lua_State* L) { lua_pushnumber(L, self(L)->getTag()); return 1; }                 // SetGreyShader / SetBright*: visual-only effects, added with the shader work
 
@@ -185,7 +187,7 @@ void registerNodes(lua_State* L) {
         {"SetScaleYFactor", SetScaleYFactor}, {"GetScaleXFactor", GetScaleXFactor}, {"GetScaleYFactor", GetScaleYFactor},
         {"SetRotation", SetRotation}, {"GetRotation", GetRotation}, {"SetZOrder", SetZOrder}, {"GetZOrder", GetZOrder},
         {"SetAnchorPoint", SetAnchorPoint}, {"SetOpacity", SetOpacity}, {"setCascadeOpacityEnabled", setCascadeOpacityEnabled},
-        {"setCascadeColorEnabled", setCascadeColorEnabled}, {"GetContentSize", GetContentSize}, {"GetSize", GetSize},
+        {"setCascadeColorEnabled", setCascadeColorEnabled}, {"GetContentSize", GetContentSize}, {"GetContentWidth", GetContentWidth}, {"GetContentHeight", GetContentHeight}, {"GetSize", GetSize},
         {"IsObjectActive", IsObjectActive}, {"AddChild", AddChild}, {"AddLayer", AddChild}, {"RemoveLayer", RemoveChild},
         {"SetContentSize", SetContentSize}, {"SetTag", SetTag}, {"GetTag", GetTag}, {"AddNode", AddNode}, {"RemoveChild", RemoveChild},
         {"RemoveSelf", RemoveSelf}, {"RemoveAllChild", RemoveAllChild}, {"DeleteMe", DeleteMe},

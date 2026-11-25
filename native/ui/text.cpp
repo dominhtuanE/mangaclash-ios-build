@@ -116,6 +116,10 @@ int getText(lua_State* L) {
     else lua_pushstring(L, "");
     return 1;
 }
+int setPasswordMode(lua_State* L) {                      // EditText:SetPasswordMode(true) -> show dots
+    if (auto* f = dynamic_cast<cocos2d::ui::TextField*>(toNode(L, 1))) { f->setPasswordEnabled(lua_toboolean(L, 2) != 0); f->setPasswordStyleText("*"); }
+    return 0;
+}
 int setStroke(lua_State* L) { if (Label* l = labelOf(L)) applyStroke(l, lua_toboolean(L, 2) != 0); return 0; }
 int setStrokeColor(lua_State* L) {
     if (Label* l = labelOf(L))
@@ -152,7 +156,7 @@ void addMethods(lua_State* L) {
         {"SetStroke", setStroke}, {"SetStrokeColor", setStrokeColor}, {"SetTextColor", setTextColor}, {"SetFontSize", setFontSize}, {"SetFontName", noop},
         {"SetTextVertiacalAlign", setAlign}, {"SetPlaceHolderColor", noop}, {"SetMaxLength", noop},
         {"SetKeyBoardDidHideCallBack", noop}, {"SetKeyBoardDidShowCallBack", noop}, {"SetKeyBoardWillShowCallBack", noop},
-        {"DetachWithIME", noop}, {"SetFilterWords", noop},
+        {"DetachWithIME", noop}, {"SetPasswordMode", setPasswordMode}, {"SetFilterWords", noop},
     };
     for (const R& r : regs) { lua_pushcfunction(L, r.f); lua_setfield(L, -2, r.n); }
     lua_pop(L, 1);
