@@ -116,7 +116,7 @@ void registerWidgets(lua_State* L) {
     };
     cls("UITouchGroupEx", "Create", touchGroupCreate);
     cls("WidgetUnity", "GetWidgetByName", getWidgetByName);
-    lua_getglobal(L, "ResHelper");
+    lua_getglobal(L, "GameLib"); lua_getfield(L, -1, "ResHelper"); lua_remove(L, -2);   // global ResHelper only exists after main.lua runs
     if (lua_istable(L, -1)) { lua_pushcfunction(L, createWidgetFromJson); lua_setfield(L, -2, "CreateWidgetFromJsonFile"); }
     lua_pop(L, 1);
 

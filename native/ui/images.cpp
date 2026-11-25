@@ -185,7 +185,7 @@ void registerImages(lua_State* L) {
     lua_pushcfunction(L, newImageData);
     lua_setglobal(L, "ImageData");
 
-    lua_getglobal(L, "ResHelper");
+    lua_getglobal(L, "GameLib"); lua_getfield(L, -1, "ResHelper"); lua_remove(L, -2);   // global ResHelper only exists after main.lua runs
     if (lua_istable(L, -1)) {
         lua_pushcfunction(L, loadImageResource); lua_setfield(L, -2, "LoadImageResource");
         for (const char* n : {"ReleaseUnusedImageExcept", "ReleaseImageResource", "PrintAllTextureCache"}) { lua_pushcfunction(L, noopRes); lua_setfield(L, -2, n); }
