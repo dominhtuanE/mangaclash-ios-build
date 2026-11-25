@@ -38,8 +38,7 @@ std::string rlogTail(int lines) {
     std::lock_guard<std::mutex> lk(g_mu);
     std::string out;
     size_t from = g_tail.size() > static_cast<size_t>(lines) ? g_tail.size() - lines : 0;
-    for (size_t i = from; i < g_tail.size(); ++i) { out += g_tail[i]; out += '
-'; }
+    for (size_t i = from; i < g_tail.size(); ++i) { out += g_tail[i]; out += '\n'; }
     return out;
 }
 
@@ -57,8 +56,7 @@ void rlog(const char* fmt, ...) {
     std::lock_guard<std::mutex> lk(g_mu);
     g_tail.emplace_back(buf);
     if (g_tail.size() > 60) g_tail.pop_front();
-    if (!g_file.empty()) { if (FILE* f = std::fopen(g_file.c_str(), "a")) { std::fprintf(f, "%s
-", buf); std::fclose(f); } }
+    if (!g_file.empty()) { if (FILE* f = std::fopen(g_file.c_str(), "a")) { std::fprintf(f, "%s\n", buf); std::fclose(f); } }
     if (g_q.size() < 500) g_q.emplace_back(buf);
     g_cv.notify_all();
 }
