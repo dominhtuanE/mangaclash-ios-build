@@ -114,7 +114,7 @@ void registerCore(Host& h) {
     sub(L, "SystemTools", {{"GetIdentifierForAdvertisers", retEmptyStr}, {"GetPackageName", retPackage}, {"IsApptorePackage", retFalse},
                            {"GetDeviceId", retDeviceId}, {"GetMacAddress", retEmptyStr}, {"GetAppVersion", retAppVersion},
                            {"GetIosVersion", retIosVersion}, {"GetDeviceModel", retModel}, {"GetAppPath", retEmptyStr},
-                           {"SupportParticle", retFalse}, {"GetMoneySymbol", retEmptyStr}});
+                           {"SupportParticle", retFalse}, {"IsSupport", retFalse}, {"GetMoneySymbol", retEmptyStr}});
     sub(L, "SdkTools", {{"GetSdkName", retSdkName}, {"IsInited", retTrue}, {"IsThirdAccountPlat", retFalse}, {"SetLuaPayCallback", ret0},
                         {"SetLuaCommonHandleCallback", ret0}, {"SetLuaMemoryWarnCallback", ret0},
                         {"GetSdkVersion", retStr2}, {"IsLimitPackage", retFalse}, {"GetChannelId", retEmptyStr}, {"IsSelfLoginSystem", retTrue},

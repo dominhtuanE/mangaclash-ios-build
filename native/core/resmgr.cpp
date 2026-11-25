@@ -277,6 +277,8 @@ void fillResManager(lua_State* L) {                       // GameLib on top of t
     const char* names[] = {"VS_INVALID", "VS_INIT_NEW", "VS_DOWNLOAD_NEW", "VS_SERVER_NEW", "VS_NOT_EXIST", "VS_INIT_EX_NEW"};
     int vals[] = {0, 1, 2, 3, 4, 5};
     for (int i = 0; i < 6; ++i) { lua_pushnumber(L, vals[i]); lua_setfield(L, -2, names[i]); }
+    lua_pushcfunction(L, [](lua_State* S) { lua_pushstring(S, "0"); return 1; });
+    lua_setfield(L, -2, "GetRemoteSvnVersion");
     lua_pushvalue(L, -1);
     lua_setfield(L, -3, "FileVersion");
     lua_setglobal(L, "FileVersion");
