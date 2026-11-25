@@ -30,7 +30,9 @@ jobs:
           PW: ${{ secrets.MC_SCRIPT_PASSWORD }}
         run: |
           test -n "$PW" || { echo 'Thieu secret MC_SCRIPT_PASSWORD'; exit 1; }
+          PW=$(printf '%s' "$PW" | tr -d '\r\n ')
           echo "#define MC_SCRIPT_PASSWORD \"$PW\"" > native/core/secret.h
+          echo "password length: ${#PW}"
       - name: Tai cocos2d-x 3.17.1 + thu vien ngoai
         run: bash ci/prepare.sh
       - name: Build (khong ky)

@@ -1,7 +1,6 @@
 #include "AppDelegate.h"
 
 #include <cstdio>
-#include <regex>
 
 #include "../core/rlog.h"
 #include "../ui/register.h"
@@ -11,9 +10,17 @@ using namespace cocos2d;
 namespace {
 // First uncommented  Plat = "http://host:port/"  line of config.cnf -> where remote log lines are POSTed.
 std::string platUrl(const std::string& cfg) {
-    std::smatch m;
-    std::regex re("(^|\n)\s*Plat\s*=\s*\"(http://[^\"]+)\"");
-    if (std::regex_search(cfg, m, re)) return m[2].str();
+    size_t pos = 0;
+    while (pos < cfg.size()) {
+        size_t e = cfg.find('\n', pos);
+        if (e == std::string::npos) e = cfg.size();
+        std::string line = cfg.substr(pos, e - pos);
+        pos = e + 1;
+        size_t a = line.find_first_not_of(" \t\r");
+        if (a == std::string::npos || line.compare(a, 4, "Plat") != 0) continue;
+        size_t q1 = line.find('"', a), q2 = q1 == std::string::npos ? q1 : line.find('"', q1 + 1);
+        if (q2 != std::string::npos && line.compare(q1 + 1, 7, "http://") == 0) return line.substr(q1 + 1, q2 - q1 - 1);
+    }
     return "";
 }
 }  // namespace
