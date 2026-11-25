@@ -1,6 +1,7 @@
 // GameLib.ResManager / FileVersion: resource availability + on-demand download from the game's CDN.
 // Files shipped inside the app (resourceDir) count as present; everything else listed in the server's version.ios is fetched into the
 // writable directory (writableDir/resource/...) when the game asks for it (UpdateFileList), like the original client did.
+#include <chrono>
 #include <condition_variable>
 #include <cstdio>
 #include <cstdlib>
@@ -85,7 +86,11 @@ void worker(Host* h) {
             g_queue.pop_front();
         }
         std::string base;
-        { std::lock_guard<std::mutex> lk(g_mu); base = g_cdn; }
+        for (int i = 0; i < 75; ++i) {                    // the CDN address arrives asynchronously; wait up to 15 s
+            { std::lock_guard<std::mutex> lk(g_mu); base = g_cdn; }
+            if (!base.empty()) break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        }
         bool ok = false;
         long len = 0;
         int ret = 1;
@@ -146,20 +151,43 @@ void loadRemoteList(Host* h, const std::string& cdn) {
 }
 
 // ---- natives (':' methods: index 1 is self)
-int setPlatAndResURL(lua_State* L) {
-    std::string cdn = lua_isstring(L, 3) ? lua_tostring(L, 3) : "";
-    if (cdn.empty()) return 0;
+void useCdn(Host* h, std::string cdn) {
     if (cdn.compare(0, 7, "http://") != 0) cdn = "http://" + cdn;
     if (cdn.back() != '/') cdn += '/';
     {
         std::lock_guard<std::mutex> lk(g_mu);
-        if (g_cdn == cdn) return 0;
+        if (g_cdn == cdn) return;
         g_cdn = cdn;
         g_remoteLoaded = false;
     }
-    Host* h = &H(L);
     rlog("[res] cdn = %s", cdn.c_str());
-    h->spawn([h, cdn]() { loadRemoteList(h, cdn); });
+    g_cv.notify_all();
+    loadRemoteList(h, cdn);
+}
+
+// SetPlatAndResURL(self, platUrl, cdn): cdn may be empty, then the platform server tells it: POST <plat>cdn/version.php -> {"msg":{"cdn":"host:port"}}
+int setPlatAndResURL(lua_State* L) {
+    std::string plat = lua_isstring(L, 2) ? lua_tostring(L, 2) : "";
+    std::string cdn = lua_isstring(L, 3) ? lua_tostring(L, 3) : "";
+    if (cdn == "nil") cdn.clear();
+    Host* h = &H(L);
+    if (!cdn.empty()) { h->spawn([h, cdn]() { useCdn(h, cdn); }); return 0; }
+    if (plat.empty()) return 0;
+    std::string lang = "vn";
+    lua_getglobal(L, "Config");
+    if (lua_istable(L, -1)) { lua_getfield(L, -1, "Language"); if (lua_isstring(L, -1)) lang = lua_tostring(L, -1); lua_pop(L, 1); }
+    lua_pop(L, 1);
+    h->spawn([h, plat, lang]() {
+        for (int attempt = 0; attempt < 5; ++attempt) {
+            HttpResult r = httpRequest(plat + "cdn/version.php", {{"lang", lang}, {"version", "2.20.141113"}}, 8000);
+            size_t k = r.body.find("\"cdn\"");
+            if (r.code == 200 && k != std::string::npos) {
+                size_t q1 = r.body.find('"', r.body.find(':', k) + 1), q2 = q1 == std::string::npos ? q1 : r.body.find('"', q1 + 1);
+                if (q2 != std::string::npos) { useCdn(h, r.body.substr(q1 + 1, q2 - q1 - 1)); return; }
+            }
+            rlog("[res] cdn/version.php failed (%d %s), retry", r.code, r.error.c_str());
+        }
+    });
     return 0;
 }
 
