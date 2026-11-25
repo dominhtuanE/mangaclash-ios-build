@@ -22,8 +22,10 @@ xcodebuild -project build/ios/MangaClash.xcodeproj -target MangaClash -configura
 RC=$?
 grep -E "error:|BUILD (SUCCEEDED|FAILED)" out/build.log | sort -u | head -80
 [ $RC -eq 0 ] || exit $RC
-APP=$(find build/products -name "MangaClash.app" -maxdepth 3 | head -1)
+APP=$(find build -name "MangaClash.app" -type d | head -1)
 echo "App: $APP"
+[ -n "$APP" ] || { find build -name "*.app" | head; exit 1; }
+file "$APP/MangaClash" || true
 rm -rf out/Payload && mkdir -p out/Payload && cp -R "$APP" out/Payload/
 (cd out && zip -qry MangaClash_shell.ipa Payload)
 ls -la out/MangaClash_shell.ipa
