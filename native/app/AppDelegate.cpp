@@ -1,10 +1,22 @@
 #include "AppDelegate.h"
 
 #include <cstdio>
+#include <regex>
 
+#include "../core/rlog.h"
 #include "../ui/register.h"
 
 using namespace cocos2d;
+
+namespace {
+// First uncommented  Plat = "http://host:port/"  line of config.cnf -> where remote log lines are POSTed.
+std::string platUrl(const std::string& cfg) {
+    std::smatch m;
+    std::regex re("(^|\n)\s*Plat\s*=\s*\"(http://[^\"]+)\"");
+    if (std::regex_search(cfg, m, re)) return m[2].str();
+    return "";
+}
+}  // namespace
 
 bool AppDelegate::applicationDidFinishLaunching() {
     auto director = Director::getInstance();
@@ -18,6 +30,12 @@ bool AppDelegate::applicationDidFinishLaunching() {
 
     std::string dir = resourceDir_.empty() ? FileUtils::getInstance()->getWritablePath() + "resource" : resourceDir_;
     FileUtils::getInstance()->addSearchPath(dir);
+    std::string cfg = FileUtils::getInstance()->getStringFromFile(dir + "/../config.cnf");
+    std::string url = platUrl(cfg);
+    mc::rlog("[boot] start dir=%s config=%zu bytes plat=%s", dir.c_str(), cfg.size(), url.c_str());
+    if (!url.empty()) mc::rlogSetUrl(url);
+    Size fs = glview->getFrameSize();
+    mc::rlog("[boot] frame %.0fx%.0f", fs.width, fs.height);
     mc::ui::setResourceRoot(dir + "/");
     mc::ui::setFontFile(dir + "/../zhunyuan.ttf");
 
@@ -27,13 +45,23 @@ bool AppDelegate::applicationDidFinishLaunching() {
     mc::ui::registerAll(host_->L());
 
     std::string err;
-    if (!host_->loadBundles(dir) || !host_->loadConfig(dir + "/../config.cnf", err) || !host_->boot(err)) {
-        std::printf("[boot] %s\n", err.c_str());
-        return false;
-    }
+    if (!host_->loadBundles(dir)) { mc::rlog("[boot] FAIL loadBundles (script*.ios missing or wrong password)"); return false; }
+    if (!host_->loadConfig(dir + "/../config.cnf", err)) { mc::rlog("[boot] FAIL config: %s", err.c_str()); return false; }
+    if (!host_->boot(err)) { mc::rlog("[boot] FAIL main(): %s", err.c_str()); return false; }
+    mc::rlog("[boot] main() ok");
     director->getScheduler()->schedule([this](float dt) {
         std::string e;
-        if (!host_->update(dt, e)) std::printf("[lua] %s\n", e.c_str());
+        static int frame = 0;
+        static size_t seen = 0;
+        static int errs = 0;
+        ++frame;
+        if (!host_->update(dt, e) && errs++ < 20) mc::rlog("[lua] frame %d: %s", frame, e.c_str());
+        auto& miss = host_->missing();
+        for (; seen < miss.size(); ++seen) mc::rlog("[missing] %s", miss[seen].c_str());
+        if (frame == 1 || frame == 60 || frame == 300) {
+            auto* run = Director::getInstance()->getRunningScene();
+            mc::rlog("[frame %d] scene=%s children=%zu", frame, run ? "yes" : "NONE", run ? run->getChildrenCount() : 0);
+        }
     }, this, 0, false, "mc.lua.update");
     return true;
 }

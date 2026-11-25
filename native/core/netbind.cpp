@@ -4,6 +4,7 @@
 
 #include "host.h"
 #include "net.h"
+#include "rlog.h"
 
 namespace mc {
 namespace {

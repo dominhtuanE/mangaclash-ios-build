@@ -2,6 +2,7 @@
 #include <cstdio>
 
 #include "host.h"
+#include "rlog.h"
 
 namespace mc {
 namespace {
