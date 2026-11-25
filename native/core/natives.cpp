@@ -15,6 +15,11 @@ int retFalse(lua_State* L) { lua_pushboolean(L, 0); return 1; }
 int retEmptyStr(lua_State* L) { lua_pushstring(L, ""); return 1; }
 int retPackage(lua_State* L) { lua_pushstring(L, "com.emti.mangaclash"); return 1; }
 int retStr2(lua_State* L) { lua_pushstring(L, "2"); return 1; }
+int retDeviceId(lua_State* L) { lua_pushstring(L, "ios-mangaclash"); return 1; }
+int retAppVersion(lua_State* L) { lua_pushstring(L, "2.20.141113"); return 1; }
+int retIosVersion(lua_State* L) { lua_pushstring(L, "17"); return 1; }
+int retModel(lua_State* L) { lua_pushstring(L, "iPhone"); return 1; }
+int retOne(lua_State* L) { lua_pushnumber(L, 1); return 1; }
 int retSdkName(lua_State* L) { lua_pushstring(L, "apple"); return 1; }
 int nowMsEpoch(lua_State* L) {
     using namespace std::chrono;
@@ -101,10 +106,15 @@ void registerCore(Host& h) {
     sub(L, "SceneManager", {{"GetSize", sceneGetSize}, {"GetScaleSize", sceneGetScale}, {"GetRunningScene", sceneGetRunningScene},
                             {"SetGameFrame", ret0}, {"SetKeypadEnabled", ret0}, {"SetLuaBackKey", ret0}, {"SetLuaTouchDown", ret0}});
     sub(L, "FontManager", {{"registerFilterChar", ret0}, {"registerFont", ret0}});
-    sub(L, "SoundManager", {});
+    sub(L, "SoundManager", {{"SetBGMusicVolume", ret0}, {"StopBGMusic", ret0}, {"UnloadEffect", ret0}, {"StopEffect", ret0},
+                            {"SetEffectsVolume", ret0}, {"PreloadEffect", ret0}, {"PlayEffect", ret0}, {"PlayBGMusic", ret0},
+                            {"GetBGMusicVolume", retOne}});
     lua_getfield(L, -1, "ResHelper");
     lua_pop(L, 1);
-    sub(L, "SystemTools", {{"GetIdentifierForAdvertisers", retEmptyStr}, {"GetPackageName", retPackage}, {"IsApptorePackage", retFalse}});
+    sub(L, "SystemTools", {{"GetIdentifierForAdvertisers", retEmptyStr}, {"GetPackageName", retPackage}, {"IsApptorePackage", retFalse},
+                           {"GetDeviceId", retDeviceId}, {"GetMacAddress", retEmptyStr}, {"GetAppVersion", retAppVersion},
+                           {"GetIosVersion", retIosVersion}, {"GetDeviceModel", retModel}, {"GetAppPath", retEmptyStr},
+                           {"SupportParticle", retFalse}, {"GetMoneySymbol", retEmptyStr}});
     sub(L, "SdkTools", {{"GetSdkName", retSdkName}, {"IsInited", retTrue}, {"IsThirdAccountPlat", retFalse}, {"SetLuaPayCallback", ret0},
                         {"SetLuaCommonHandleCallback", ret0}, {"SetLuaMemoryWarnCallback", ret0},
                         {"GetSdkVersion", retStr2}, {"IsLimitPackage", retFalse}, {"GetChannelId", retEmptyStr}, {"IsSelfLoginSystem", retTrue},

@@ -97,6 +97,21 @@ int getHeight(lua_State* L) { Node* n = toNode(L, 1); lua_pushnumber(L, n ? n->g
 // ---- ResHelper: preload the sub-images a widget layout refers to by name ("resource/ui_res/x/name.png")
 std::map<std::string, std::vector<std::string>> g_clipKeys;
 
+// ResHelper.IsImageExistInCache(path) / LoadAsyncImageFile(path, callbackId): decode on demand, then report back on the next frame
+int noopRes(lua_State*) { return 0; }
+int isImageInCache(lua_State* L) {
+    std::string p = luaL_checkstring(L, 1);
+    lua_pushboolean(L, Director::getInstance()->getTextureCache()->getTextureForKey(p) != nullptr);
+    return 1;
+}
+int loadAsyncImageFile(lua_State* L) {
+    std::string p = luaL_checkstring(L, 1);
+    int id = lua_isnumber(L, 2) ? static_cast<int>(lua_tonumber(L, 2)) : 0;
+    textureFor(p);
+    if (id > 0) Director::getInstance()->getScheduler()->performFunctionInCocosThread([id]() { runCallback(id); });
+    return 0;
+}
+
 int loadImageResource(lua_State* L) { lua_pushboolean(L, textureFor(luaL_checkstring(L, 1)) != nullptr); return 1; }
 
 // LoadWidgetImageResource(image_path, {ImageData{x,y,width,height,clip_image_name}...}): crops each rectangle into its own texture
@@ -173,6 +188,9 @@ void registerImages(lua_State* L) {
     lua_getglobal(L, "ResHelper");
     if (lua_istable(L, -1)) {
         lua_pushcfunction(L, loadImageResource); lua_setfield(L, -2, "LoadImageResource");
+        for (const char* n : {"ReleaseUnusedImageExcept", "ReleaseImageResource", "PrintAllTextureCache"}) { lua_pushcfunction(L, noopRes); lua_setfield(L, -2, n); }
+        lua_pushcfunction(L, isImageInCache); lua_setfield(L, -2, "IsImageExistInCache");
+        lua_pushcfunction(L, loadAsyncImageFile); lua_setfield(L, -2, "LoadAsyncImageFile");
         lua_pushcfunction(L, loadWidgetImageResource); lua_setfield(L, -2, "LoadWidgetImageResource");
         lua_pushcfunction(L, releaseWidgetImageResource); lua_setfield(L, -2, "ReleaseWidgetImageResource");
     }
