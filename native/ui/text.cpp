@@ -120,6 +120,22 @@ int setPasswordMode(lua_State* L) {                      // EditText:SetPassword
     if (auto* f = dynamic_cast<cocos2d::ui::TextField*>(toNode(L, 1))) { f->setPasswordEnabled(lua_toboolean(L, 2) != 0); f->setPasswordStyleText("*"); }
     return 0;
 }
+int setTextWH(lua_State* L) {                            // SetTextWidthAndHeight(w, h) / SetTextWidth(w) / SetTextHeight(h)
+    if (Label* l = labelOf(L)) {
+        float w = static_cast<float>(luaL_optnumber(L, 2, 0)), h = static_cast<float>(luaL_optnumber(L, 3, 0));
+        l->setDimensions(w, h);
+    }
+    return 0;
+}
+int setTextW(lua_State* L) { if (Label* l = labelOf(L)) l->setDimensions(static_cast<float>(luaL_optnumber(L, 2, 0)), l->getDimensions().height); return 0; }
+int setTextH(lua_State* L) { if (Label* l = labelOf(L)) l->setDimensions(l->getDimensions().width, static_cast<float>(luaL_optnumber(L, 2, 0))); return 0; }
+int setFontSpacing(lua_State* L) { if (Label* l = labelOf(L)) l->setAdditionalKerning(static_cast<float>(luaL_optnumber(L, 2, 0))); return 0; }
+int setButtonTextColor(lua_State* L) {
+    if (auto* bt = dynamic_cast<cocos2d::ui::Button*>(toNode(L, 1)))
+        bt->setTitleColor(Color3B(static_cast<GLubyte>(luaL_checknumber(L, 2)), static_cast<GLubyte>(luaL_checknumber(L, 3)), static_cast<GLubyte>(luaL_checknumber(L, 4))));
+    return 0;
+}
+int removeNodeChild(lua_State* L) { Node* n = toNode(L, 1); Node* c = toNode(L, 2); if (n && c) n->removeChild(c, true); return 0; }
 int setStroke(lua_State* L) { if (Label* l = labelOf(L)) applyStroke(l, lua_toboolean(L, 2) != 0); return 0; }
 int setStrokeColor(lua_State* L) {
     if (Label* l = labelOf(L))
@@ -156,7 +172,10 @@ void addMethods(lua_State* L) {
         {"SetStroke", setStroke}, {"SetStrokeColor", setStrokeColor}, {"SetTextColor", setTextColor}, {"SetFontSize", setFontSize}, {"SetFontName", noop},
         {"SetTextVertiacalAlign", setAlign}, {"SetPlaceHolderColor", noop}, {"SetMaxLength", noop},
         {"SetKeyBoardDidHideCallBack", noop}, {"SetKeyBoardDidShowCallBack", noop}, {"SetKeyBoardWillShowCallBack", noop},
-        {"DetachWithIME", noop}, {"SetPasswordMode", setPasswordMode}, {"SetFilterWords", noop},
+        {"DetachWithIME", noop}, {"SetTextWidthAndHeight", setTextWH}, {"SetTextWidth", setTextW}, {"SetTextHeight", setTextH}, {"SetFontSpacing", setFontSpacing},
+        {"SetButtonTextColor", setButtonTextColor}, {"RemoveNode", removeNodeChild}, {"SetShadowColor", noop}, {"SetUpdate", noop},
+        {"SetMansualUpdate", noop}, {"Destroy", noop}, {"SetTemplate", noop}, {"SetDisabledImage", noop}, {"ResetSize", noop},
+        {"DrawSolidTriangle", noop}, {"SetPlayeEndListener", noop}, {"SetPasswordMode", setPasswordMode}, {"SetFilterWords", noop},
     };
     for (const R& r : regs) { lua_pushcfunction(L, r.f); lua_setfield(L, -2, r.n); }
     lua_pop(L, 1);

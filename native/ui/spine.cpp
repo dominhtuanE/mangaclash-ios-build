@@ -158,6 +158,39 @@ int getPlayAnimationTime(lua_State* L) {
     return 1;
 }
 
+int setAnimationPlayTime(lua_State* L) {                 // SetAnimationPlayTime(name, totalSeconds): speed so the animation lasts that long
+    auto* n = sk(L);
+    const char* name = lua_tostring(L, 2);
+    double total = luaL_optnumber(L, 3, 0);
+    if (n && name && total > 0) {
+        spTrackEntry* t = n->getCurrent(0);
+        if (t && t->animation && std::strcmp(t->animation->name, name) == 0 && t->animation->duration > 0)
+            n->getState()->timeScale = static_cast<float>(t->animation->duration / total);
+    }
+    return 0;
+}
+
+// GameLib.SkeletonDataCahce:AddSsdzSkeletonDataAsync(path, callbackId): load, then tell Lua (loading waits for it)
+void notifyLater(int id) {
+    Director::getInstance()->getScheduler()->performFunctionInCocosThread([id]() { runCallback(id); });
+}
+int sdcAddSsdz(lua_State* L) {
+    const char* p = lua_tostring(L, 2);
+    int id = static_cast<int>(luaL_optnumber(L, 3, 0));
+    if (p) { std::string f = resolveResFile(p); if (!f.empty()) loadSkel(f); }
+    notifyLater(id);
+    return 0;
+}
+int sdcAddJson(lua_State* L) { notifyLater(static_cast<int>(luaL_optnumber(L, 5, 0))); return 0; }   // (json, atlas, image, callbackId): only .ssdz skeletons are drawn
+int sdcSsdzInCache(lua_State* L) {
+    const char* p = lua_tostring(L, 2);
+    std::string f = p ? resolveResFile(p) : "";
+    auto it = g_skels.find(f);
+    lua_pushboolean(L, !f.empty() && it != g_skels.end());
+    return 1;
+}
+int sdcTrue(lua_State* L) { lua_pushboolean(L, 1); return 1; }
+
 }  // namespace
 
 void registerSpine(lua_State* L) {
@@ -177,8 +210,21 @@ void registerSpine(lua_State* L) {
         {"SetToSetupPose", setToSetupPose}, {"SetTimeScale", setTimeScale}, {"ResumeAnimation", resumeAnimation}, {"StopAnimation", stopAnimation},
         {"SetToPlayTime", setToPlayTime}, {"IsAnimationExist", isAnimationExist}, {"GetPlayAnimationName", getPlayAnimationName},
         {"GetPlayAnimationTime", getPlayAnimationTime},
+        {"SetAnimationPlayTime", setAnimationPlayTime},
     };
     for (const R& r : regs) { lua_pushcfunction(L, r.f); lua_setfield(L, -2, r.n); }
+    lua_pop(L, 1);
+
+    lua_getglobal(L, "GameLib");                             // GameLib.SkeletonDataCahce:...
+    if (lua_istable(L, -1)) {
+        lua_getfield(L, -1, "SkeletonDataCahce");
+        if (!lua_istable(L, -1)) { lua_pop(L, 1); lua_newtable(L); lua_pushvalue(L, -1); lua_setfield(L, -3, "SkeletonDataCahce"); }
+        struct F { const char* n; lua_CFunction f; };
+        static const F fs[] = {{"AddSsdzSkeletonDataAsync", sdcAddSsdz}, {"AddSkeletonDataAsync", sdcAddJson}, {"IsSSdzDataInCache", sdcSsdzInCache},
+                               {"IsSkeletonDataInCache", sdcTrue}, {"LoadSsdzSkeletonData", sdcAddSsdz}};
+        for (const F& f : fs) { lua_pushcfunction(L, f.f); lua_setfield(L, -2, f.n); }
+        lua_pop(L, 1);
+    }
     lua_pop(L, 1);
 }
 

@@ -2,6 +2,7 @@
 #include <map>
 
 #include "common.h"
+#include "ui/UIScale9Sprite.h"
 #include "lua_node.h"
 #include "register.h"
 #include "../core/rlog.h"
@@ -50,6 +51,19 @@ Sprite* spriteArg(lua_State* L, int i) {
     else return nullptr;
     return makeSprite(d);
 }
+void resizeNode(Node* n, float w, float h) {              // w/h < 0: keep. 9-slice resizes, everything else is scaled to the size
+    if (!n) return;
+    if (auto* s9 = dynamic_cast<cocos2d::ui::Scale9Sprite*>(n)) {
+        Size cs = s9->getContentSize();
+        s9->setContentSize(Size(w >= 0 ? w : cs.width, h >= 0 ? h : cs.height));
+        return;
+    }
+    Size cs = n->getContentSize();
+    if (cs.width > 0 && w >= 0) n->setScaleX(w / cs.width);
+    if (cs.height > 0 && h >= 0) n->setScaleY(h / cs.height);
+}
+int setContentWidthM(lua_State* L) { resizeNode(toNode(L, 1), static_cast<float>(luaL_checknumber(L, 2)), -1); return 0; }
+int setContentHeightM(lua_State* L) { resizeNode(toNode(L, 1), -1, static_cast<float>(luaL_checknumber(L, 2))); return 0; }
 int progressCreate(lua_State* L) {
     Sprite* bar = spriteArg(L, 1);
     if (!bar) bar = Sprite::create();
@@ -129,6 +143,7 @@ void registerMisc(lua_State* L) {
     };
     cls("GraphicLabel", "Node", graphicNode);
     cls("ProgressControl", "CreateWithImage", progressCreate);
+    cls("Progress9Control", "CreateWithImage", progressCreate);
     cls("StencilContainer", "Node", stencilNode);
     cls("SkeletonAnimation", "CreateWithFile", emptyNode);
     cls("SpineEffect", "CreateWithFile", emptyNode);
@@ -144,7 +159,7 @@ void registerMisc(lua_State* L) {
     static const R regs[] = {
         {"DrawSolidRect", drawSolidRect}, {"DrawRect", drawRect}, {"DrawLine", drawLine}, {"SetLineWidth", setLineWidth},
         {"RemoveAllNodes", clearNodes}, {"SetProgress", setProgress}, {"SetProgressMax", setProgressMax}, {"SetStencilMask", setStencilMask}, {"SetInverted", setInverted},
-        {"SetAlphaTestValue", setAlphaTest}, {"SetLuaUpdate", setLuaUpdate}, {"SetScissorSection", setScissor},
+        {"SetAlphaTestValue", setAlphaTest}, {"SetContentWidth", setContentWidthM}, {"SetContentHeight", setContentHeightM}, {"SetLuaUpdate", setLuaUpdate}, {"SetScissorSection", setScissor},
     };
     for (const R& r : regs) { lua_pushcfunction(L, r.f); lua_setfield(L, -2, r.n); }
     lua_pop(L, 1);

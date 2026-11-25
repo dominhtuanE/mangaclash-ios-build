@@ -224,7 +224,7 @@ void registerCore(Host& h) {
                         {"SetLuaCommonHandleCallback", ret0}, {"SetLuaMemoryWarnCallback", ret0},
                         {"GetSdkVersion", retStr2}, {"IsLimitPackage", retFalse}, {"GetChannelId", retEmptyStr}, {"IsSelfLoginSystem", retTrue},
                         {"IsYingYongBao", retFalse}, {"GetCampuuidInfo", retEmptyStr}, {"GetPhpUserInfoUrl", retEmptyStr},
-                        {"GetUserCenterStr", retEmptyStr}, {"GetLogoImagePath", retEmptyStr}, {"GetLoginImagePath", retEmptyStr}, {"SetLuaLoginCallback", ret0}, {"ReportOpenChargePanel", ret0}, {"ReSaveSdkCallbackInfo", ret0}});
+                        {"GetUserCenterStr", retEmptyStr}, {"GetLogoImagePath", retEmptyStr}, {"GetLoginImagePath", retEmptyStr}, {"SetLuaLoginCallback", ret0}, {"ReportOpenChargePanel", ret0}, {"CommonHandle", ret0}, {"ReSaveSdkCallbackInfo", ret0}});
     sub(L, "GameEngine", {{"GetNowTime", nowMsEpoch}, {"GetTimeTicket", nowSecEpoch}, {"CloseApp", ret0}});
     sub(L, "MsgPush", {{"StartMsgPush", ret0}, {"SetTimerTask", ret0}, {"CancelTimerTask", ret0}, {"DelegateSocket", ret0}, {"SetAlias", ret0}});
     sub(L, "FaceConvHelper", {{"registerFace", ret0}, {"convertToFaceStr", retArg2}});

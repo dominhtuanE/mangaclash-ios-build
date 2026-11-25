@@ -1,5 +1,6 @@
 // ImageLabel / Image9Label / ImageButton and the widget-image cache (ResHelper.*):
 // sprites are cut from the game's atlas images (.sdz = 4-byte tag + JPEG/PNG), rectangles come from the Lua ImageData tables.
+#include <cmath>
 #include <map>
 #include <string>
 #include <vector>
@@ -83,7 +84,18 @@ int setInnerRect(lua_State* L) {                        // 9-slice centre rectan
     return 0;
 }
 
-int setFlipX(lua_State* L) { if (Sprite* s = spriteSelf(L)) s->setFlippedX(lua_toboolean(L, 2) != 0); return 0; }
+int setFlipX(lua_State* L) {
+    bool f = lua_toboolean(L, 2) != 0;
+    if (Sprite* s = spriteSelf(L)) s->setFlippedX(f);
+    else if (Node* n = toNode(L, 1)) n->setScaleX(f ? -std::fabs(n->getScaleX()) : std::fabs(n->getScaleX()));   // spine / other nodes
+    return 0;
+}
+int setFlipY(lua_State* L) {
+    bool f = lua_toboolean(L, 2) != 0;
+    if (Sprite* s = spriteSelf(L)) s->setFlippedY(f);
+    else if (Node* n = toNode(L, 1)) n->setScaleY(f ? -std::fabs(n->getScaleY()) : std::fabs(n->getScaleY()));
+    return 0;
+}
 int setNodeColor(lua_State* L) {
     if (Node* n = toNode(L, 1)) {
         Color3B c(static_cast<GLubyte>(luaL_checknumber(L, 2)), static_cast<GLubyte>(luaL_checknumber(L, 3)), static_cast<GLubyte>(luaL_checknumber(L, 4)));
@@ -212,7 +224,7 @@ void registerImages(lua_State* L) {
     struct R { const char* n; lua_CFunction f; };
     static const R regs[] = {
         {"SetImage", setImage}, {"SetImageData", setImage}, {"StretchTo", stretchTo}, {"SetStretchSize", stretchTo}, {"SetInnerRect", setInnerRect},
-        {"SetFlipX", setFlipX}, {"SetColor", setNodeColor}, {"GetWidth", getWidth}, {"GetHeight", getHeight},
+        {"SetFlipX", setFlipX}, {"SetFlipY", setFlipY}, {"SetColor", setNodeColor}, {"GetWidth", getWidth}, {"GetHeight", getHeight},
     };
     for (const R& r : regs) { lua_pushcfunction(L, r.f); lua_setfield(L, -2, r.n); }
     lua_pop(L, 1);
