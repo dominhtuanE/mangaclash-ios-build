@@ -117,6 +117,12 @@ int getText(lua_State* L) {
     return 1;
 }
 int setStroke(lua_State* L) { if (Label* l = labelOf(L)) applyStroke(l, lua_toboolean(L, 2) != 0); return 0; }
+int setStrokeColor(lua_State* L) {
+    if (Label* l = labelOf(L))
+        l->enableOutline(Color4B(static_cast<GLubyte>(luaL_checknumber(L, 2)), static_cast<GLubyte>(luaL_checknumber(L, 3)),
+                                 static_cast<GLubyte>(luaL_checknumber(L, 4)), 255), 2);
+    return 0;
+}
 int setTextColor(lua_State* L) {
     Color3B c(static_cast<GLubyte>(luaL_checknumber(L, 2)), static_cast<GLubyte>(luaL_checknumber(L, 3)), static_cast<GLubyte>(luaL_checknumber(L, 4)));
     if (Label* l = labelOf(L)) l->setTextColor(Color4B(c));
@@ -143,7 +149,7 @@ void addMethods(lua_State* L) {
     struct R { const char* n; lua_CFunction f; };
     static const R regs[] = {
         {"SetString", setString}, {"SetText", setString}, {"GetText", getText}, {"GetString", getText},
-        {"SetStroke", setStroke}, {"SetTextColor", setTextColor}, {"SetFontSize", setFontSize}, {"SetFontName", noop},
+        {"SetStroke", setStroke}, {"SetStrokeColor", setStrokeColor}, {"SetTextColor", setTextColor}, {"SetFontSize", setFontSize}, {"SetFontName", noop},
         {"SetTextVertiacalAlign", setAlign}, {"SetPlaceHolderColor", noop}, {"SetMaxLength", noop},
         {"SetKeyBoardDidHideCallBack", noop}, {"SetKeyBoardDidShowCallBack", noop}, {"SetKeyBoardWillShowCallBack", noop},
         {"DetachWithIME", noop}, {"SetFilterWords", noop},

@@ -43,8 +43,8 @@ int resSetSetting(lua_State* L) {
 // ---- GameLib.SceneManager
 int sceneGetSize(lua_State* L) {          // fills a COCOSize table {width,height} passed as arg 2
     if (lua_istable(L, 2)) {
-        lua_pushnumber(L, 640); lua_setfield(L, 2, "width");
-        lua_pushnumber(L, 960); lua_setfield(L, 2, "height");
+        lua_pushnumber(L, 960); lua_setfield(L, 2, "width");
+        lua_pushnumber(L, 640); lua_setfield(L, 2, "height");
     }
     return 0;
 }
@@ -109,7 +109,7 @@ void registerCore(Host& h) {
                         {"SetLuaCommonHandleCallback", ret0}, {"SetLuaMemoryWarnCallback", ret0},
                         {"GetSdkVersion", retStr2}, {"IsLimitPackage", retFalse}, {"GetChannelId", retEmptyStr}, {"IsSelfLoginSystem", retTrue},
                         {"IsYingYongBao", retFalse}, {"GetCampuuidInfo", retEmptyStr}, {"GetPhpUserInfoUrl", retEmptyStr},
-                        {"GetUserCenterStr", retEmptyStr}, {"ReportOpenChargePanel", ret0}, {"ReSaveSdkCallbackInfo", ret0}});
+                        {"GetUserCenterStr", retEmptyStr}, {"GetLogoImagePath", retEmptyStr}, {"ReportOpenChargePanel", ret0}, {"ReSaveSdkCallbackInfo", ret0}});
     sub(L, "GameEngine", {{"GetNowTime", nowMsEpoch}, {"GetTimeTicket", nowSecEpoch}, {"CloseApp", ret0}});
     sub(L, "MsgPush", {{"StartMsgPush", ret0}});
     sub(L, "FaceConvHelper", {{"registerFace", ret0}});
@@ -132,6 +132,7 @@ void registerCore(Host& h) {
     fn(L, "GetCocosVersion", getCocosVersion);
     fn(L, "Rand", gameRand);
     fn(L, "COCOLog", cocosLog);
+    fillResManager(L);
     lua_setglobal(L, "GameLib");
     for (const char* cls : {
 #include "native_classes.inc"

@@ -16,7 +16,8 @@ lua_State* g_L = nullptr;
 
 namespace {
 
-std::string g_root;                                       // ".../MangaClash.app/resource/"
+std::string g_root;
+std::string g_dl;                                          // downloaded files: <Documents>/resource/                                       // ".../MangaClash.app/resource/"
 std::map<std::string, Texture2D*> g_tex;
 std::set<std::string> g_loggedMissing;
 std::set<std::string> g_loadedModules;
@@ -96,11 +97,17 @@ std::string moduleFile(const std::string& module) {
 }  // namespace
 
 void setResourceRoot(const std::string& root) { g_root = root; }
+void setDownloadRoot(const std::string& root) { g_dl = root; }
 
 std::string resolveResFile(const std::string& path) {
-    std::string a = absPath(path);
-    if (exists(a)) return a;
-    for (const char* e : {".sdz", ".ssdz", ".png", ".jpg"}) { std::string c = withExt(a, e); if (exists(c)) return c; }
+    std::string rel = path.compare(0, 9, "resource/") == 0 ? path.substr(9) : path;
+    std::string roots[2] = {g_root, g_dl};
+    for (const std::string& root : roots) {
+        if (root.empty()) continue;
+        std::string a = root + rel;
+        if (exists(a)) return a;
+        for (const char* e : {".sdz", ".ssdz", ".png", ".jpg"}) { std::string c = withExt(a, e); if (exists(c)) return c; }
+    }
     return "";
 }
 

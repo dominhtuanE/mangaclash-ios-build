@@ -17,6 +17,7 @@ void registerWidgets(lua_State* L);
 void registerMisc(lua_State* L);
 void registerRes(lua_State* L);
 void setResourceRoot(const std::string& root);
+void setDownloadRoot(const std::string& root);
 void setFontFile(const std::string& path);
 // Call after mc::registerCore so these real classes replace the logging stubs.
 inline void registerAll(lua_State* L) {

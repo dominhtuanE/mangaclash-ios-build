@@ -32,20 +32,23 @@ bool AppDelegate::applicationDidFinishLaunching() {
         glview = GLViewImpl::create("MangaClash");
         director->setOpenGLView(glview);
     }
-    glview->setDesignResolutionSize(640, 960, ResolutionPolicy::SHOW_ALL);
+    glview->setDesignResolutionSize(960, 640, ResolutionPolicy::SHOW_ALL);
     director->setAnimationInterval(1.0 / 60);
 
     std::string dir = resourceDir_.empty() ? FileUtils::getInstance()->getWritablePath() + "resource" : resourceDir_;
     FileUtils::getInstance()->addSearchPath(dir);
+    FileUtils::getInstance()->addSearchPath(FileUtils::getInstance()->getWritablePath());
+    FileUtils::getInstance()->addSearchPath(FileUtils::getInstance()->getWritablePath() + "resource");
+    mc::ui::setDownloadRoot(FileUtils::getInstance()->getWritablePath() + "resource/");
     std::string cfg = FileUtils::getInstance()->getStringFromFile(dir + "/../config.cnf");
     std::string url = platUrl(cfg);
     mc::rlogSetFile(FileUtils::getInstance()->getWritablePath() + "mc.log");
     {
         auto* lbl = Label::createWithSystemFont("", "Menlo", 13);
         lbl->setAnchorPoint(Vec2(0, 1));
-        lbl->setPosition(Vec2(4, 956));
+        lbl->setPosition(Vec2(4, 636));
         lbl->setTextColor(Color4B(0, 255, 0, 255));
-        lbl->setDimensions(630, 0);
+        lbl->setDimensions(950, 0);
         director->setNotificationNode(lbl);
         director->getScheduler()->schedule([lbl](float) { lbl->setString(mc::rlogTail(30)); }, lbl, 0.5f, false, "mc.dbg.overlay");
     }
@@ -57,6 +60,7 @@ bool AppDelegate::applicationDidFinishLaunching() {
     mc::ui::setFontFile(dir + "/../zhunyuan.ttf");
 
     host_.reset(new mc::Host());
+    host_->writableDir = FileUtils::getInstance()->getWritablePath();
     mc::registerCore(*host_);
     mc::registerNet(*host_);
     mc::ui::registerAll(host_->L());

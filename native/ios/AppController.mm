@@ -10,8 +10,8 @@
 
 @implementation RootViewController
 - (BOOL)prefersStatusBarHidden { return YES; }
-- (BOOL)shouldAutorotate { return NO; }
-- (UIInterfaceOrientationMask)supportedInterfaceOrientations { return UIInterfaceOrientationMaskPortrait; }
+- (BOOL)shouldAutorotate { return YES; }
+- (UIInterfaceOrientationMask)supportedInterfaceOrientations { return UIInterfaceOrientationMaskLandscape; }
 @end
 
 static AppDelegate* s_app = nullptr;

@@ -31,6 +31,7 @@ public:
     std::map<std::string, std::string>& settings() { return settings_; }
     std::vector<std::string>& missing() { return missing_; }
     std::string platform = "apple";
+    std::string writableDir;                        // app Documents/ (downloaded resources go to writableDir/resource/...), ends with '/'
     std::string resourceDir;                        // loose game data (.cnf / .zcnf) next to the script bundles
     void post(std::function<void()> fn);            // thread-safe: runs fn on the next update() (main thread)
     void spawn(std::function<void()> fn) { threads_.emplace_back(std::move(fn)); }
@@ -46,6 +47,7 @@ private:
 };
 
 Host* hostOf(lua_State* L);
+void fillResManager(lua_State* L);                  // resmgr.cpp: GameLib.ResManager + FileVersion
 void registerCore(Host& h);                         // GameLib stubs/natives shared by every platform
 void registerNet(Host& h);                          // MessageAdapter + HTTP bindings
 void pumpNet(Host& h);                              // called every update(): drains sockets into Lua

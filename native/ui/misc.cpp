@@ -1,4 +1,6 @@
 // Smaller node classes: GraphicLabel (drawing), ProgressControl, StencilContainer, placeholders for Spine / particles, value types.
+#include <map>
+
 #include "common.h"
 #include "lua_node.h"
 #include "register.h"
@@ -66,6 +68,17 @@ int progressCreate(lua_State* L) {
 }
 
 // ---- StencilContainer
+float g_dummy = 0;
+std::map<Node*, float> g_progMax;
+int setProgress(lua_State* L) {
+    auto* t = dynamic_cast<ProgressTimer*>(toNode(L, 1));
+    if (!t) return 0;
+    float mx = g_progMax.count(t) ? g_progMax[t] : 100.f;
+    t->setPercentage(numAt(L, 2, 0) * 100.f / (mx > 0 ? mx : 100.f));
+    return 0;
+}
+int setProgressMax(lua_State* L) { if (Node* n = toNode(L, 1)) g_progMax[n] = numAt(L, 2, 100); return 0; }
+
 int stencilNode(lua_State* L) { ClippingNode* c = ClippingNode::create(); c->setAlphaThreshold(0.05f); pushNode(L, c); return 1; }
 int setStencilMask(lua_State* L) {
     auto* c = dynamic_cast<ClippingNode*>(toNode(L, 1));
@@ -130,7 +143,7 @@ void registerMisc(lua_State* L) {
     struct R { const char* n; lua_CFunction f; };
     static const R regs[] = {
         {"DrawSolidRect", drawSolidRect}, {"DrawRect", drawRect}, {"DrawLine", drawLine}, {"SetLineWidth", setLineWidth},
-        {"RemoveAllNodes", clearNodes}, {"SetStencilMask", setStencilMask}, {"SetInverted", setInverted},
+        {"RemoveAllNodes", clearNodes}, {"SetProgress", setProgress}, {"SetProgressMax", setProgressMax}, {"SetStencilMask", setStencilMask}, {"SetInverted", setInverted},
         {"SetAlphaTestValue", setAlphaTest}, {"SetLuaUpdate", setLuaUpdate}, {"SetScissorSection", setScissor},
     };
     for (const R& r : regs) { lua_pushcfunction(L, r.f); lua_setfield(L, -2, r.n); }

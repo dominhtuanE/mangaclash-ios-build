@@ -15,7 +15,7 @@ endif()
 
 file(GLOB LUA_SRC third_party/lua/*.c)
 set(MC_SOURCES
-  core/bundle.cpp core/host.cpp core/natives.cpp core/netbind.cpp core/net.cpp core/http.cpp core/rlog.cpp
+  core/bundle.cpp core/host.cpp core/natives.cpp core/netbind.cpp core/net.cpp core/http.cpp core/rlog.cpp core/resmgr.cpp
   third_party/miniz/miniz.c ${LUA_SRC}
   ui/lua_node.cpp ui/images.cpp ui/text.cpp ui/scene.cpp ui/res.cpp ui/touch.cpp ui/actions.cpp ui/widgets.cpp ui/misc.cpp
   app/AppDelegate.cpp
