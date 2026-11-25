@@ -1,5 +1,9 @@
 // FontLabel / RichText / EditText on top of cocos2d::Label and ui::TextField. Font: zhunyuan.ttf shipped beside the resources.
 #include "ui/UITextField.h"
+#include "ui/UIText.h"
+#include "ui/UIButton.h"
+
+#include <cstdlib>
 
 #include "lua_node.h"
 
@@ -18,7 +22,34 @@ struct Meta {                                   // extra state kept per text nod
 
 Label* labelOf(lua_State* L) {
     Node* n = toNode(L, 1);
+    if (auto* t = dynamic_cast<cocos2d::ui::Text*>(n)) return dynamic_cast<Label*>(t->getVirtualRenderer());
     return dynamic_cast<Label*>(n);
+}
+
+// RichText markup: <COLOR VALUE={AARRGGBB,...} OUTLINE=AARRGGBB>text</COLOR>, <BR>, other tags dropped. Only the first colour is used.
+bool hexColor(const std::string& s, size_t pos, Color4B& out) {
+    if (pos + 8 > s.size()) return false;
+    unsigned v = static_cast<unsigned>(std::strtoul(s.substr(pos, 8).c_str(), nullptr, 16));
+    out = Color4B((v >> 16) & 255, (v >> 8) & 255, v & 255, (v >> 24) & 255);
+    return true;
+}
+std::string stripMarkup(const std::string& in, bool& hasColor, Color4B& color, bool& hasOutline, Color4B& outline) {
+    std::string out;
+    hasColor = hasOutline = false;
+    for (size_t i = 0; i < in.size();) {
+        if (in[i] != '<') { out += in[i++]; continue; }
+        size_t e = in.find('>', i);
+        if (e == std::string::npos) { out += in.substr(i); break; }
+        std::string tag = in.substr(i + 1, e - i - 1);
+        if (tag.compare(0, 5, "COLOR") == 0) {
+            size_t v = tag.find("VALUE={");
+            if (v != std::string::npos && !hasColor) hasColor = hexColor(tag, v + 7, color);
+            size_t o = tag.find("OUTLINE=");
+            if (o != std::string::npos && !hasOutline) hasOutline = hexColor(tag, o + 8, outline);
+        } else if (tag == "BR" || tag == "BR/") out += '\n';
+        i = e + 1;
+    }
+    return out;
 }
 
 Label* makeLabel(const std::string& text, float size) {
@@ -64,7 +95,18 @@ int editTextCreate(lua_State* L) {
 
 int setString(lua_State* L) {
     const char* t = lua_tostring(L, 2);
-    if (Label* l = labelOf(L)) l->setString(t ? t : "");
+    if (auto* tx = dynamic_cast<cocos2d::ui::Text*>(toNode(L, 1))) { tx->setString(t ? t : ""); return 0; }
+    if (auto* bt = dynamic_cast<cocos2d::ui::Button*>(toNode(L, 1))) { bt->setTitleText(t ? t : ""); return 0; }
+    if (Label* l = labelOf(L)) {
+        std::string raw = t ? t : "";
+        if (raw.find('<') != std::string::npos) {
+            bool hc, ho; Color4B c, o;
+            std::string plain = stripMarkup(raw, hc, c, ho, o);
+            l->setString(plain);
+            if (hc) l->setTextColor(Color4B(c.r, c.g, c.b, 255));
+            if (ho) l->enableOutline(Color4B(o.r, o.g, o.b, 255), 2);
+        } else l->setString(raw);
+    }
     else if (auto* f = dynamic_cast<cocos2d::ui::TextField*>(toNode(L, 1))) f->setString(t ? t : "");
     return 0;
 }

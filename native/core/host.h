@@ -31,6 +31,7 @@ public:
     std::map<std::string, std::string>& settings() { return settings_; }
     std::vector<std::string>& missing() { return missing_; }
     std::string platform = "apple";
+    std::string resourceDir;                        // loose game data (.cnf / .zcnf) next to the script bundles
     void post(std::function<void()> fn);            // thread-safe: runs fn on the next update() (main thread)
     void spawn(std::function<void()> fn) { threads_.emplace_back(std::move(fn)); }
 

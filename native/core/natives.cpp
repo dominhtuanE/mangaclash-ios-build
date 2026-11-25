@@ -14,6 +14,7 @@ int retTrue(lua_State* L) { lua_pushboolean(L, 1); return 1; }
 int retFalse(lua_State* L) { lua_pushboolean(L, 0); return 1; }
 int retEmptyStr(lua_State* L) { lua_pushstring(L, ""); return 1; }
 int retPackage(lua_State* L) { lua_pushstring(L, "com.emti.mangaclash"); return 1; }
+int retStr2(lua_State* L) { lua_pushstring(L, "2"); return 1; }
 int retSdkName(lua_State* L) { lua_pushstring(L, "apple"); return 1; }
 int nowMsEpoch(lua_State* L) {
     using namespace std::chrono;
@@ -105,7 +106,10 @@ void registerCore(Host& h) {
     lua_pop(L, 1);
     sub(L, "SystemTools", {{"GetIdentifierForAdvertisers", retEmptyStr}, {"GetPackageName", retPackage}, {"IsApptorePackage", retFalse}});
     sub(L, "SdkTools", {{"GetSdkName", retSdkName}, {"IsInited", retTrue}, {"IsThirdAccountPlat", retFalse}, {"SetLuaPayCallback", ret0},
-                        {"SetLuaCommonHandleCallback", ret0}, {"SetLuaMemoryWarnCallback", ret0}});
+                        {"SetLuaCommonHandleCallback", ret0}, {"SetLuaMemoryWarnCallback", ret0},
+                        {"GetSdkVersion", retStr2}, {"IsLimitPackage", retFalse}, {"GetChannelId", retEmptyStr}, {"IsSelfLoginSystem", retTrue},
+                        {"IsYingYongBao", retFalse}, {"GetCampuuidInfo", retEmptyStr}, {"GetPhpUserInfoUrl", retEmptyStr},
+                        {"GetUserCenterStr", retEmptyStr}, {"ReportOpenChargePanel", ret0}, {"ReSaveSdkCallbackInfo", ret0}});
     sub(L, "GameEngine", {{"GetNowTime", nowMsEpoch}, {"GetTimeTicket", nowSecEpoch}, {"CloseApp", ret0}});
     sub(L, "MsgPush", {{"StartMsgPush", ret0}});
     sub(L, "FaceConvHelper", {{"registerFace", ret0}});

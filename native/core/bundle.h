@@ -13,6 +13,7 @@ public:
     bool exists(const std::string& name) const;
     bool read(const std::string& name, std::string& out) const;
     size_t size() const { return entries_.size(); }
+    bool readFirst(std::string& out) const { return !entries_.empty() && read(entries_.begin()->first, out); }
 
 private:
     struct Entry { size_t bundle; uint32_t offset, compSize, size; uint16_t method, flags; };

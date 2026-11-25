@@ -23,6 +23,24 @@ int bundleLoader(lua_State* L) {
     return 1;
 }
 
+// require("ui_res/account") -> <resourceDir>/ui_res/account.cnf (plain Lua); require("language/xx/config/y.zcnf") -> first entry of that zip.
+int resourceLoader(lua_State* L) {
+    const char* name = luaL_checkstring(L, 1);
+    Host* h = hostOf(L);
+    std::string n(name), src;
+    bool zc = n.size() > 5 && n.compare(n.size() - 5, 5, ".zcnf") == 0;
+    std::string path = h->resourceDir + "/" + n + (zc ? "" : ".cnf");
+    if (zc) {
+        BundleFs fs;
+        if (!fs.addBundle(path, "") || !fs.readFirst(src)) { lua_pushfstring(L, "%sno resource file '%s'", "\n\t", path.c_str()); return 1; }
+    } else if (!readFile(path, src)) {
+        lua_pushfstring(L, "%sno resource file '%s'", "\n\t", path.c_str());
+        return 1;
+    }
+    if (luaL_loadbuffer(L, src.data(), src.size(), n.c_str()) != 0) return lua_error(L);
+    return 1;
+}
+
 int missingCall(lua_State* L) {          // unimplemented native called: log once, return nil
     Host* h = hostOf(L);
     const char* id = lua_tostring(L, lua_upvalueindex(1));
@@ -69,6 +87,7 @@ void Host::post(std::function<void()> fn) {
 }
 
 bool Host::loadBundles(const std::string& dir) {
+    resourceDir = dir;
     for (int i = 0; i <= 10; ++i)
         if (!fs_.addBundle(dir + "/script" + std::to_string(i) + ".ios", kPassword)) return false;
     return true;
