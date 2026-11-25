@@ -8,3 +8,6 @@ D=$(ls -d /tmp/deps/*/ | head -1)
 cp -R "$D". engine/external/
 ls engine/external | head -40
 ls engine/external/png/prebuilt/ios || true
+
+# --- vá cho Xcode/SDK moi ---
+sed -i '' 's/iconv_close(_iconv)/iconv_close((iconv_t)_iconv)/; s/iconv(_iconv,/iconv((iconv_t)_iconv,/' engine/cocos/2d/CCFontAtlas.cpp

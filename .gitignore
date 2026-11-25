@@ -3,3 +3,4 @@ build/
 out/
 *.ipa
 native/core/secret.h
+run_ci.ps1
