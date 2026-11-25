@@ -39,7 +39,7 @@ template <typename T> void put(std::string& b, T v) { b.append(reinterpret_cast<
 bool PacketWriter::header(uint16_t code, uint16_t gs) { put(buf_, code); put(buf_, gs); return true; }
 bool PacketWriter::u32(uint32_t v) { put(buf_, v); return true; }
 bool PacketWriter::bytes(const std::string& s, size_t n) {
-    std::string t = s.substr(0, n ? n - 1 : 0);
+    std::string t = s.substr(0, n);                 // char[n] holds up to n bytes (a 32-hex login ticket fills it; no NUL reserved)
     t.resize(n, '\0');
     buf_ += t;
     return true;
