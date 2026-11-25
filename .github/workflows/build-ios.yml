@@ -1,0 +1,49 @@
+# Build "IPA khung" MangaClash (arm64, khong ky, chua co du lieu game) tren may Mac cua GitHub.
+# Du lieu game + ky IPA lam tren Windows (tools/make_ios_ipa.py, Sideloadly).
+name: build-ios-shell
+
+on:
+  workflow_dispatch:
+    inputs:
+      xcode:
+        description: 'Phien ban Xcode (de trong = mac dinh cua runner)'
+        required: false
+        default: ''
+  push:
+    branches: [main]
+    paths: ['native/**', 'ci/**', '.github/workflows/**']
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      COCOS_TAG: 'cocos2d-x-3.17.1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Chon Xcode
+        run: |
+          if [ -n "${{ github.event.inputs.xcode }}" ]; then sudo xcode-select -s "/Applications/Xcode_${{ github.event.inputs.xcode }}.app"; fi
+          xcodebuild -version
+      - name: Tao secret.h
+        env:
+          PW: ${{ secrets.MC_SCRIPT_PASSWORD }}
+        run: |
+          test -n "$PW" || { echo 'Thieu secret MC_SCRIPT_PASSWORD'; exit 1; }
+          echo "#define MC_SCRIPT_PASSWORD \"$PW\"" > native/core/secret.h
+      - name: Tai cocos2d-x 3.17.1 + thu vien ngoai
+        run: bash ci/prepare.sh
+      - name: Build (khong ky)
+        run: bash ci/build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mangaclash-ios-shell
+          path: out/MangaClash_shell.ipa
+          if-no-files-found: error
+      - name: Log loi
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: out/*.log
+          if-no-files-found: ignore
