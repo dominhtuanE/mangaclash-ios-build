@@ -124,7 +124,7 @@ int setAnimation(lua_State* L) {                         // SetAnimation(track, 
 int setAnimationListener(lua_State* L) {                 // SetAnimationListener(callbackId): fires when an animation completes
     if (auto* n = sk(L)) {
         int id = static_cast<int>(luaL_checknumber(L, 2));
-        n->setCompleteListener([id](int, int) {
+        n->setCompleteListener([id](spTrackEntry*) {
             Director::getInstance()->getScheduler()->performFunctionInCocosThread([id]() { runCallback(id); });   // the callback may delete the node
         });
     }
