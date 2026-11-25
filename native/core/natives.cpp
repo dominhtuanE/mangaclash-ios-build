@@ -13,6 +13,18 @@ int ret0(lua_State*) { return 0; }
 int retTrue(lua_State* L) { lua_pushboolean(L, 1); return 1; }
 int retFalse(lua_State* L) { lua_pushboolean(L, 0); return 1; }
 int retEmptyStr(lua_State* L) { lua_pushstring(L, ""); return 1; }
+int retPackage(lua_State* L) { lua_pushstring(L, "com.emti.mangaclash"); return 1; }
+int retSdkName(lua_State* L) { lua_pushstring(L, "apple"); return 1; }
+int nowMsEpoch(lua_State* L) {
+    using namespace std::chrono;
+    lua_pushnumber(L, static_cast<double>(duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count()));
+    return 1;
+}
+int nowSecEpoch(lua_State* L) {
+    using namespace std::chrono;
+    lua_pushnumber(L, static_cast<double>(duration_cast<seconds>(system_clock::now().time_since_epoch()).count()));
+    return 1;
+}
 
 // ---- GameLib.ResManager (methods use ':' so arg 1 is self)
 int resGetSystemType(lua_State* L) { lua_pushstring(L, H(L).platform.c_str()); return 1; }
@@ -65,7 +77,7 @@ int gameRand(lua_State* L) {              // Rand(n) -> [1,n]; Rand(a,b) -> [a,b
 
 int cocosLog(lua_State* L) {
     const char* m = lua_tostring(L, 1);
-    std::printf("[lua] %s\n", m ? m : "");
+    rlog("[lua] %s", m ? m : "");
     return 0;
 }
 
@@ -84,14 +96,20 @@ void registerCore(Host& h) {
     lua_State* L = h.L();
     lua_newtable(L);                                     // GameLib
     sub(L, "ResManager", {{"GetSystemType", resGetSystemType}, {"GetSetting", resGetSetting}, {"SetSetting", resSetSetting},
-                          {"SetPlatAndResURL", ret0}, {"SetGameURL", ret0}});
+                          {"SetPlatAndResURL", ret0}, {"SetGameURL", ret0}, {"GetUpdateFileList", ret0}, {"UpdateFileList", ret0}, {"CancelUpdateFileList", ret0}});
     sub(L, "SceneManager", {{"GetSize", sceneGetSize}, {"GetScaleSize", sceneGetScale}, {"GetRunningScene", sceneGetRunningScene},
                             {"SetGameFrame", ret0}, {"SetKeypadEnabled", ret0}, {"SetLuaBackKey", ret0}, {"SetLuaTouchDown", ret0}});
     sub(L, "FontManager", {{"registerFilterChar", ret0}, {"registerFont", ret0}});
     sub(L, "SoundManager", {});
     lua_getfield(L, -1, "ResHelper");
     lua_pop(L, 1);
-    for (const char* t : {"SystemTools", "SdkTools", "NodeUnity", "ActionManager", "UIListViewEx", "UIPageViewEx",
+    sub(L, "SystemTools", {{"GetIdentifierForAdvertisers", retEmptyStr}, {"GetPackageName", retPackage}, {"IsApptorePackage", retFalse}});
+    sub(L, "SdkTools", {{"GetSdkName", retSdkName}, {"IsInited", retTrue}, {"IsThirdAccountPlat", retFalse}, {"SetLuaPayCallback", ret0},
+                        {"SetLuaCommonHandleCallback", ret0}, {"SetLuaMemoryWarnCallback", ret0}});
+    sub(L, "GameEngine", {{"GetNowTime", nowMsEpoch}, {"GetTimeTicket", nowSecEpoch}, {"CloseApp", ret0}});
+    sub(L, "MsgPush", {{"StartMsgPush", ret0}});
+    sub(L, "FaceConvHelper", {{"registerFace", ret0}});
+    for (const char* t : {"NodeUnity", "ActionManager", "UIListViewEx", "UIPageViewEx",
                           "UIScrollViewEx", "ExtraComponet", "MessageMem"})
         sub(L, t, {});
     sub(L, "ResHelper", {{"GetCompressSuffix", sufCompress}, {"GetMusicSuffix", sufMusic}, {"GetSoundSuffix", sufSound},

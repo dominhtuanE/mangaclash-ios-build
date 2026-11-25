@@ -124,7 +124,7 @@ int maConnect(lua_State* L) {
             lua_pushnumber(L, port);
             lua_pushnumber(L, netid);
             callGlobal(L, "OnConnect", 6, err);
-            if (!err.empty()) std::printf("[net] OnConnect error: %s\n", err.c_str());
+            if (!err.empty()) rlog("[net] OnConnect error: %s", err.c_str());
         });
     });
     lua_pushboolean(L, 1);
@@ -162,7 +162,7 @@ void httpCall(lua_State* L, const std::string& url) {
             lua_pushlstring(L, r.body.data(), r.body.size());
             lua_pushnumber(L, static_cast<double>(r.body.size()));
             callGlobal(L, "RunCallBackFunc", 9, err);
-            if (!err.empty()) std::printf("[net] http callback error: %s\n", err.c_str());
+            if (!err.empty()) rlog("[net] http callback error: %s", err.c_str());
         });
     });
 }
@@ -217,7 +217,7 @@ void pumpNet(Host& h) {
             g.reader.load(f);
             lua_pushnumber(h.L(), kv.first);
             std::string err;
-            if (!callGlobal(h.L(), "OnRecv", 1, err)) std::printf("[net] OnRecv error: %s\n", err.c_str());
+            if (!callGlobal(h.L(), "OnRecv", 1, err)) rlog("[net] OnRecv error: %s", err.c_str());
         }
         if (closed) dead.push_back(kv.first);
     }
@@ -225,7 +225,7 @@ void pumpNet(Host& h) {
         g.conns.erase(id);
         lua_pushnumber(h.L(), id);
         std::string err;
-        if (!callGlobal(h.L(), "OnDisconnect", 1, err)) std::printf("[net] OnDisconnect error: %s\n", err.c_str());
+        if (!callGlobal(h.L(), "OnDisconnect", 1, err)) rlog("[net] OnDisconnect error: %s", err.c_str());
     }
 }
 

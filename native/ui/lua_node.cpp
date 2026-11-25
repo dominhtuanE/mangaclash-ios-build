@@ -1,6 +1,10 @@
 #include "lua_node.h"
 
 #include <cstdio>
+#include <set>
+#include <string>
+
+#include "../core/rlog.h"
 
 using namespace cocos2d;
 
@@ -134,7 +138,19 @@ int NU_Resume(lua_State* L) { if (Node* n = toNode(L, 1)) n->resume(); return 0;
 int NU_Retain(lua_State* L) { if (Node* n = toNode(L, 1)) n->retain(); return 0; }
 int NU_Release(lua_State* L) { if (Node* n = toNode(L, 1)) n->release(); return 0; }
 int NU_IsNodeEqual(lua_State* L) { lua_pushboolean(L, toNode(L, 1) == toNode(L, 2)); return 1; }
-int NU_Noop(lua_State*) { return 0; }                 // SetGreyShader / SetBright*: visual-only effects, added with the shader work
+int NU_Noop(lua_State*) { return 0; }
+
+// Unknown method on a node: log it once (so the server log shows what is still missing) and return a no-op.
+int nodeMissingIndex(lua_State* L) {
+    const char* key = lua_tostring(L, 2);
+    static std::set<std::string> seen;
+    if (key && seen.insert(key).second) rlog("[missing-method] Node:%s", key);
+    lua_pushcfunction(L, NU_Noop);
+    return 1;
+}
+int SetContentSize(lua_State* L) { self(L)->setContentSize(Size(static_cast<float>(luaL_checknumber(L, 2)), static_cast<float>(luaL_checknumber(L, 3)))); return 0; }
+int SetTag(lua_State* L) { self(L)->setTag(static_cast<int>(luaL_checknumber(L, 2))); return 0; }
+int GetTag(lua_State* L) { lua_pushnumber(L, self(L)->getTag()); return 1; }                 // SetGreyShader / SetBright*: visual-only effects, added with the shader work
 
 // ---- GameScene / GameLayer constructors
 int GS_Node(lua_State* L) { Node* n = Node::create(); n->setAnchorPoint(Vec2::ZERO); pushNode(L, n); return 1; }
@@ -170,7 +186,8 @@ void registerNodes(lua_State* L) {
         {"SetRotation", SetRotation}, {"GetRotation", GetRotation}, {"SetZOrder", SetZOrder}, {"GetZOrder", GetZOrder},
         {"SetAnchorPoint", SetAnchorPoint}, {"SetOpacity", SetOpacity}, {"setCascadeOpacityEnabled", setCascadeOpacityEnabled},
         {"setCascadeColorEnabled", setCascadeColorEnabled}, {"GetContentSize", GetContentSize}, {"GetSize", GetSize},
-        {"IsObjectActive", IsObjectActive}, {"AddChild", AddChild}, {"AddNode", AddNode}, {"RemoveChild", RemoveChild},
+        {"IsObjectActive", IsObjectActive}, {"AddChild", AddChild}, {"AddLayer", AddChild}, {"RemoveLayer", RemoveChild},
+        {"SetContentSize", SetContentSize}, {"SetTag", SetTag}, {"GetTag", GetTag}, {"AddNode", AddNode}, {"RemoveChild", RemoveChild},
         {"RemoveSelf", RemoveSelf}, {"RemoveAllChild", RemoveAllChild}, {"DeleteMe", DeleteMe},
     };
     luaL_newmetatable(L, kNodeMeta);
@@ -179,6 +196,10 @@ void registerNodes(lua_State* L) {
     lua_pushcfunction(L, gc);
     lua_setfield(L, -2, "__gc");
     setAll(L, lua_gettop(L), methods, sizeof(methods) / sizeof(methods[0]));
+    lua_newtable(L);                                    // metatable of the metatable: fallback for unknown methods
+    lua_pushcfunction(L, nodeMissingIndex);
+    lua_setfield(L, -2, "__index");
+    lua_setmetatable(L, -2);
     lua_pop(L, 1);
 
     static const Reg nodeUnity[] = {
