@@ -175,7 +175,7 @@ void addMethods(lua_State* L) {
         {"DetachWithIME", noop}, {"SetTextWidthAndHeight", setTextWH}, {"SetTextWidth", setTextW}, {"SetTextHeight", setTextH}, {"SetFontSpacing", setFontSpacing},
         {"SetButtonTextColor", setButtonTextColor}, {"RemoveNode", removeNodeChild}, {"SetShadowColor", noop}, {"SetUpdate", noop},
         {"SetMansualUpdate", noop}, {"Destroy", noop}, {"SetTemplate", noop}, {"SetDisabledImage", noop}, {"ResetSize", noop},
-        {"DrawSolidTriangle", noop}, {"SetPlayeEndListener", noop}, {"SetPasswordMode", setPasswordMode}, {"SetFilterWords", noop},
+        {"DrawSolidTriangle", noop}, {"SetPlayeEndListener", noop}, {"SetPasswordMode", setPasswordMode}, {"SetButtonText", setString}, {"SetFilterWords", noop},
     };
     for (const R& r : regs) { lua_pushcfunction(L, r.f); lua_setfield(L, -2, r.n); }
     lua_pop(L, 1);

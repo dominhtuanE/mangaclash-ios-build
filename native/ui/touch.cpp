@@ -136,7 +136,7 @@ void registerTouch(lua_State* L) {
     static const R regs[] = {
         {"SetEventListener", setEventListener}, {"SetLuaCallBack", setEventListener}, {"SetTouchRect", setTouchRect},
         {"SetTouchEnabled", setTouchEnabled}, {"SetLuaTouchDown", setDownId}, {"SetLuaTouchMove", setMoveId},
-        {"SetLuaTouchUp", setUpId}, {"SetLuaTouchEnd", setUpId}, {"SetLuaTouchLink", noop}, {"SetTouchPriority", noop},
+        {"SetLuaTouchUp", setUpId}, {"SetLuaTouchEnd", setUpId}, {"SetLuaTouchLink", noop}, {"SetLuaTouchCancel", noop}, {"SetSwallow", noop}, {"SetScissorSectionByLayer", noop}, {"SetTouchPriority", noop},
     };
     for (const R& r : regs) { lua_pushcfunction(L, r.f); lua_setfield(L, -2, r.n); }
     lua_pop(L, 1);

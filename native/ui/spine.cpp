@@ -207,7 +207,7 @@ void registerSpine(lua_State* L) {
     struct R { const char* n; lua_CFunction f; };
     static const R regs[] = {
         {"SetAnimation", setAnimation}, {"SetAnimationListener", setAnimationListener}, {"ClearAnimationListener", clearAnimationListener},
-        {"SetToSetupPose", setToSetupPose}, {"SetTimeScale", setTimeScale}, {"ResumeAnimation", resumeAnimation}, {"StopAnimation", stopAnimation},
+        {"SetToSetupPose", setToSetupPose}, {"ResetSkeleton", setToSetupPose}, {"SetTimeScale", setTimeScale}, {"ResumeAnimation", resumeAnimation}, {"StopAnimation", stopAnimation},
         {"SetToPlayTime", setToPlayTime}, {"IsAnimationExist", isAnimationExist}, {"GetPlayAnimationName", getPlayAnimationName},
         {"GetPlayAnimationTime", getPlayAnimationTime},
         {"SetAnimationPlayTime", setAnimationPlayTime},

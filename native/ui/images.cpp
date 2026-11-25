@@ -216,6 +216,7 @@ void registerImages(lua_State* L) {
         lua_setglobal(L, name);
     };
     cls("ImageLabel", "CreateWithImageFile", imageLabelCreate);
+    cls("ImageLabel", "Node", imageLabelCreate);
     cls("Label", "CreateWithImageFile", imageLabelCreate);
     cls("Image9Label", "CreateWithImageFile", image9Create);
     cls("ImageButton", "CreateWithImages", imageButtonCreate);
