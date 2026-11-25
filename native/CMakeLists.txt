@@ -1,25 +1,17 @@
-# MangaClash iOS (arm64) build. Run on macOS, see BUILD_IOS.md.
-#   cmake -S native -B build-ios -G Xcode -DCOCOS2DX_ROOT=<cocos2d-x-3.17.1> -DCMAKE_TOOLCHAIN_FILE=<cocos>/cmake/ios.toolchain.cmake -DIOS_PLATFORM=OS
+# MangaClash iOS (arm64) app. Two ways to get Cocos2d-x:
+#  - MC_COCOS_LIB=<libcocos2d iOS.a>  : link the engine prebuilt by cocos' own Xcode project (CI does this; most reliable)
+#  - otherwise                         : add the engine through its CMake files (needs an older CMake)
+#   cmake -S native -B build/ios -G Xcode -DCOCOS2DX_ROOT=<cocos2d-x-3.17.1> -DMC_COCOS_LIB=<.a> -DCMAKE_SYSTEM_NAME=iOS
 cmake_minimum_required(VERSION 3.10)
 project(MangaClash CXX C OBJC OBJCXX)
 
-cmake_policy(SET CMP0077 NEW)   # BUILD_* options set below must be honored by cocos' option()
+cmake_policy(SET CMP0077 NEW)
 set(CMAKE_CXX_STANDARD 14)
-set(COCOS2DX_ROOT "" CACHE PATH "Cocos2d-x 3.17.1 root (with external/ downloaded via download-deps.py)")
+set(COCOS2DX_ROOT "" CACHE PATH "Cocos2d-x 3.17.1 root (with external/ downloaded)")
+set(MC_COCOS_LIB "" CACHE FILEPATH "Prebuilt 'libcocos2d iOS.a'")
 if(NOT COCOS2DX_ROOT)
   message(FATAL_ERROR "Set -DCOCOS2DX_ROOT=<path to cocos2d-x-3.17.1>")
 endif()
-
-set(COCOS2DX_ROOT_PATH ${COCOS2DX_ROOT})
-set(CMAKE_MODULE_PATH ${COCOS2DX_ROOT}/cmake/Modules/)
-set(BUILD_LUA_LIBS OFF)
-set(BUILD_JS_LIBS OFF)
-set(BUILD_EXTENSIONS OFF)
-set(BUILD_EDITOR_SPINE OFF)
-set(BUILD_EDITOR_COCOSTUDIO OFF)
-set(BUILD_EDITOR_COCOSBUILDER OFF)
-include(CocosBuildSet)
-add_subdirectory(${COCOS2DX_ROOT}/cocos ${ENGINE_BINARY_PATH}/cocos/core)
 
 file(GLOB LUA_SRC third_party/lua/*.c)
 set(MC_SOURCES
@@ -29,10 +21,42 @@ set(MC_SOURCES
   app/AppDelegate.cpp
   ios/main.m ios/AppController.mm)
 
-add_executable(MangaClash MACOSX_BUNDLE ${MC_SOURCES})
-target_include_directories(MangaClash PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${COCOS2DX_ROOT} ${COCOS2DX_ROOT}/cocos ${COCOS2DX_ROOT}/cocos/platform/ios)
-target_link_libraries(MangaClash cocos2d)
-target_compile_definitions(MangaClash PRIVATE MC_IOS=1)
+if(MC_COCOS_LIB)
+  add_executable(MangaClash MACOSX_BUNDLE ${MC_SOURCES})
+  target_include_directories(MangaClash PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${COCOS2DX_ROOT} ${COCOS2DX_ROOT}/cocos
+    ${COCOS2DX_ROOT}/cocos/platform/ios ${COCOS2DX_ROOT}/cocos/editor-support ${COCOS2DX_ROOT}/extensions
+    ${COCOS2DX_ROOT}/external ${COCOS2DX_ROOT}/external/chipmunk/include)
+  # must match the defines libcocos2d.xcodeproj builds with (Node's layout depends on CC_USE_PHYSICS)
+  target_compile_definitions(MangaClash PRIVATE MC_IOS=1 CC_TARGET_OS_IPHONE USE_FILE32API CC_ENABLE_CHIPMUNK_INTEGRATION=1)
+  file(GLOB EXT_LIBS ${COCOS2DX_ROOT}/external/*/prebuilt/ios/*.a)
+  foreach(l ${EXT_LIBS})
+    if(NOT l MATCHES "spidermonkey|luajit|lua|glfw|sqlite|v8|js_static")
+      list(APPEND MC_EXT ${l})
+    endif()
+  endforeach()
+  message(STATUS "external libs: ${MC_EXT}")
+  target_link_libraries(MangaClash ${MC_COCOS_LIB} ${MC_EXT} z iconv
+    "-framework OpenGLES" "-framework UIKit" "-framework QuartzCore" "-framework CoreGraphics" "-framework CoreText"
+    "-framework AudioToolbox" "-framework OpenAL" "-framework AVFoundation" "-framework Foundation" "-framework CFNetwork"
+    "-framework GameController" "-framework MediaPlayer" "-framework SystemConfiguration" "-framework MobileCoreServices"
+    "-framework CoreMotion" "-framework CoreVideo" "-framework Security")
+else()
+  set(COCOS2DX_ROOT_PATH ${COCOS2DX_ROOT})
+  set(CMAKE_MODULE_PATH ${COCOS2DX_ROOT}/cmake/Modules/)
+  set(BUILD_LUA_LIBS OFF)
+  set(BUILD_JS_LIBS OFF)
+  set(BUILD_EXTENSIONS OFF)
+  set(BUILD_EDITOR_SPINE OFF)
+  set(BUILD_EDITOR_COCOSTUDIO OFF)
+  set(BUILD_EDITOR_COCOSBUILDER OFF)
+  include(CocosBuildSet)
+  add_subdirectory(${COCOS2DX_ROOT}/cocos ${ENGINE_BINARY_PATH}/cocos/core)
+  add_executable(MangaClash MACOSX_BUNDLE ${MC_SOURCES})
+  target_include_directories(MangaClash PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${COCOS2DX_ROOT} ${COCOS2DX_ROOT}/cocos ${COCOS2DX_ROOT}/cocos/platform/ios)
+  target_link_libraries(MangaClash cocos2d)
+  target_compile_definitions(MangaClash PRIVATE MC_IOS=1)
+endif()
+
 set_target_properties(MangaClash PROPERTIES
   MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/ios/Info.plist
   XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.emti.mangaclash"
@@ -40,5 +64,3 @@ set_target_properties(MangaClash PROPERTIES
   XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "12.0"
   XCODE_ATTRIBUTE_ARCHS "arm64"
   XCODE_ATTRIBUTE_ENABLE_BITCODE "NO")
-
-# Game data: resource/ (from the server's res folders) + config.cnf + zhunyuan.ttf are copied into the .app by tools/pack_ios_resources.py.
