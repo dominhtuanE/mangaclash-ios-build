@@ -115,7 +115,6 @@ int setLuaUpdate(lua_State* L) {
     if (id > 0) n->schedule([id](float dt) { runCallback(id, 1, dt); }, "mc.luaupdate");
     return 0;
 }
-int setScissor(lua_State* L) { (void)L; return 0; }
 
 // ---- value types used as constructors from Lua
 int newPoint(lua_State* L) { lua_createtable(L, 0, 2); lua_pushnumber(L, 0); lua_setfield(L, -2, "x"); lua_pushnumber(L, 0); lua_setfield(L, -2, "y"); return 1; }
@@ -159,7 +158,7 @@ void registerMisc(lua_State* L) {
     static const R regs[] = {
         {"DrawSolidRect", drawSolidRect}, {"DrawRect", drawRect}, {"DrawLine", drawLine}, {"SetLineWidth", setLineWidth},
         {"RemoveAllNodes", clearNodes}, {"SetProgress", setProgress}, {"SetProgressMax", setProgressMax}, {"SetStencilMask", setStencilMask}, {"SetInverted", setInverted},
-        {"SetAlphaTestValue", setAlphaTest}, {"SetContentWidth", setContentWidthM}, {"SetContentHeight", setContentHeightM}, {"SetLuaUpdate", setLuaUpdate}, {"SetScissorSection", setScissor},
+        {"SetAlphaTestValue", setAlphaTest}, {"SetContentWidth", setContentWidthM}, {"SetContentHeight", setContentHeightM}, {"SetLuaUpdate", setLuaUpdate},
     };
     for (const R& r : regs) { lua_pushcfunction(L, r.f); lua_setfield(L, -2, r.n); }
     lua_pop(L, 1);

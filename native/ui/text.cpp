@@ -120,6 +120,18 @@ int setPasswordMode(lua_State* L) {                      // EditText:SetPassword
     if (auto* f = dynamic_cast<cocos2d::ui::TextField*>(toNode(L, 1))) { f->setPasswordEnabled(lua_toboolean(L, 2) != 0); f->setPasswordStyleText("*"); }
     return 0;
 }
+cocos2d::ui::TextField* fieldOf(lua_State* L) { return dynamic_cast<cocos2d::ui::TextField*>(toNode(L, 1)); }
+int setPlaceHolderColor(lua_State* L) {
+    if (auto* f = fieldOf(L))
+        f->setPlaceHolderColor(Color3B(static_cast<GLubyte>(luaL_checknumber(L, 2)), static_cast<GLubyte>(luaL_checknumber(L, 3)),
+                                       static_cast<GLubyte>(luaL_checknumber(L, 4))));
+    return 0;
+}
+int setMaxLength(lua_State* L) {
+    int n = static_cast<int>(luaL_checknumber(L, 2));
+    if (auto* f = fieldOf(L)) { f->setMaxLengthEnabled(n > 0); if (n > 0) f->setMaxLength(n); }
+    return 0;
+}
 int setTextWH(lua_State* L) {                            // SetTextWidthAndHeight(w, h) / SetTextWidth(w) / SetTextHeight(h)
     if (Label* l = labelOf(L)) {
         float w = static_cast<float>(luaL_optnumber(L, 2, 0)), h = static_cast<float>(luaL_optnumber(L, 3, 0));
@@ -170,7 +182,7 @@ void addMethods(lua_State* L) {
     static const R regs[] = {
         {"SetString", setString}, {"SetText", setString}, {"GetText", getText}, {"GetString", getText},
         {"SetStroke", setStroke}, {"SetStrokeColor", setStrokeColor}, {"SetTextColor", setTextColor}, {"SetFontSize", setFontSize}, {"SetFontName", noop},
-        {"SetTextVertiacalAlign", setAlign}, {"SetPlaceHolderColor", noop}, {"SetMaxLength", noop},
+        {"SetTextVertiacalAlign", setAlign}, {"SetPlaceHolderColor", setPlaceHolderColor}, {"SetMaxLength", setMaxLength},
         {"SetKeyBoardDidHideCallBack", noop}, {"SetKeyBoardDidShowCallBack", noop}, {"SetKeyBoardWillShowCallBack", noop},
         {"DetachWithIME", noop}, {"SetTextWidthAndHeight", setTextWH}, {"SetTextWidth", setTextW}, {"SetTextHeight", setTextH}, {"SetFontSpacing", setFontSpacing},
         {"SetButtonTextColor", setButtonTextColor}, {"RemoveNode", removeNodeChild}, {"SetShadowColor", noop}, {"SetUpdate", noop},

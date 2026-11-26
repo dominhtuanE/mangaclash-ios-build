@@ -10,6 +10,7 @@
 #include "ui/UIWidget.h"
 
 #include "common.h"
+#include "layer.h"
 #include "lua_node.h"
 #include "register.h"
 #include "../core/rlog.h"
@@ -41,8 +42,13 @@ bool traceTouch() {
     return true;
 }
 
-bool visibleInTree(Node* n) {
-    for (; n; n = n->getParent()) if (!n->isVisible()) return false;
+// visible all the way up, and not touching a part that an enclosing layer has clipped away
+bool reachable(Node* n, const Vec2& world) {
+    for (; n; n = n->getParent()) {
+        if (!n->isVisible()) return false;
+        auto* layer = dynamic_cast<LayerNode*>(n);
+        if (layer && layer->clipsOut(world)) return false;
+    }
     return true;
 }
 
@@ -66,7 +72,7 @@ TouchState* stateForNode(Node* node) {
     st->listener = l;
     l->setSwallowTouches(true);
     l->onTouchBegan = [node, st](Touch* t, Event*) -> bool {
-        if (!st->enabled || !node->isRunning() || !visibleInTree(node)) return false;
+        if (!st->enabled || !node->isRunning() || !reachable(node, t->getLocation())) return false;
         bool image = isImage(node);
         if (image && !st->down && !st->move && !st->up) return false;
         Vec2 p = node->convertToNodeSpace(t->getLocation());
@@ -228,7 +234,7 @@ void registerTouch(lua_State* L) {
         {"SetEventListener", setEventListener}, {"SetLuaCallBack", setEventListener}, {"SetTouchRect", setTouchRect},
         {"SetTouchEnabled", setTouchEnabled}, {"SetSwallow", setSwallow}, {"SetLuaTouchDown", setDownId},
         {"SetLuaTouchMove", setMoveId}, {"SetLuaTouchUp", setUpId}, {"SetLuaTouchEnd", setUpId},
-        {"SetLuaTouchCancel", setCancelId}, {"SetLuaTouchLink", noop}, {"SetScissorSectionByLayer", noop}, {"SetTouchPriority", noop},
+        {"SetLuaTouchCancel", setCancelId}, {"SetLuaTouchLink", noop}, {"SetTouchPriority", noop},
     };
     for (const R& r : regs) { lua_pushcfunction(L, r.f); lua_setfield(L, -2, r.n); }
     lua_pop(L, 1);

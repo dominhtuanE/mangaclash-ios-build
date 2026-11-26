@@ -1,5 +1,7 @@
 #include "lua_node.h"
+#include "layer.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <set>
 #include <string>
@@ -156,7 +158,17 @@ int GetTag(lua_State* L) { lua_pushnumber(L, self(L)->getTag()); return 1; }    
 
 // ---- GameScene / GameLayer constructors
 int GS_Node(lua_State* L) { Node* n = Node::create(); n->setAnchorPoint(Vec2::ZERO); pushNode(L, n); return 1; }
-int GL_Node(lua_State* L) { Node* n = Node::create(); n->setAnchorPoint(Vec2::ZERO); pushNode(L, n); return 1; }
+int GL_Node(lua_State* L) { Node* n = LayerNode::create(); n->setAnchorPoint(Vec2::ZERO); pushNode(L, n); return 1; }
+
+// layer:SetScissorSection[ByLayer](x, y, width, height): clip drawing and touches to this node-space rectangle
+int SetScissorSection(lua_State* L) {
+    if (auto* layer = dynamic_cast<LayerNode*>(self(L))) {
+        float x = static_cast<float>(luaL_checknumber(L, 2)), y = static_cast<float>(luaL_checknumber(L, 3));
+        float w = static_cast<float>(luaL_checknumber(L, 4)), h = static_cast<float>(luaL_checknumber(L, 5));
+        layer->setSection(Rect(x, y, std::max(w, 0.0f), std::max(h, 0.0f)));
+    }
+    return 0;
+}
 
 struct Reg { const char* name; lua_CFunction fn; };
 
@@ -191,6 +203,7 @@ void registerNodes(lua_State* L) {
         {"IsObjectActive", IsObjectActive}, {"AddChild", AddChild}, {"AddLayer", AddChild}, {"RemoveLayer", RemoveChild},
         {"SetContentSize", SetContentSize}, {"SetTag", SetTag}, {"GetTag", GetTag}, {"AddNode", AddNode}, {"RemoveChild", RemoveChild},
         {"RemoveSelf", RemoveSelf}, {"RemoveAllChild", RemoveAllChild}, {"DeleteMe", DeleteMe},
+        {"SetScissorSection", SetScissorSection}, {"SetScissorSectionByLayer", SetScissorSection},
     };
     luaL_newmetatable(L, kNodeMeta);
     lua_pushvalue(L, -1);

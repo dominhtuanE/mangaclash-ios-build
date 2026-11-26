@@ -330,6 +330,12 @@ void registerCompat(lua_State* L) {
     setFields(L, nodes);
     lua_pop(L, 1);
 
+    globalTable(L, "NodeUnity");
+    { static const R f[] = {{"SetGreyShader", setGrey}}; setFields(L, f); }       // static form: (node, bool)
+    lua_pop(L, 1);
+    gameLibTable(L, "MsgPush");
+    { static const R f[] = {{"SetTag", noop}}; setFields(L, f); }                 // push notifications: none on this build
+    lua_pop(L, 1);
     globalTable(L, "UIScrollViewEx");
     { static const R f[] = {{"Create", scrollViewCreate}}; setFields(L, f); }
     constant(L, "ScrollDirNone", 0); constant(L, "ScrollDirVertical", 1); constant(L, "ScrollDirHorizontal", 2); constant(L, "ScrollDirBoth", 3);

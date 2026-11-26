@@ -63,6 +63,19 @@ int missingIndex(lua_State* L) {       // __index on tables whose native members
     return 1;
 }
 
+// error handler: append the Lua stack, so a server log line says who called the failing function
+int withTraceback(lua_State* L) {
+    lua_getglobal(L, "debug");
+    if (!lua_istable(L, -1)) { lua_pop(L, 1); return 1; }
+    lua_getfield(L, -1, "traceback");
+    lua_remove(L, -2);
+    if (!lua_isfunction(L, -1)) { lua_pop(L, 1); return 1; }
+    lua_pushvalue(L, 1);
+    lua_pushinteger(L, 2);
+    lua_call(L, 2, 1);
+    return 1;
+}
+
 }  // namespace
 
 Host* hostOf(lua_State*) { return g_host; }
@@ -103,8 +116,13 @@ bool callGlobal(lua_State* L, const char* fn, int nargs, std::string& err) {
     lua_getglobal(L, fn);
     if (!lua_isfunction(L, -1)) { lua_pop(L, 1 + nargs); err = std::string("global '") + fn + "' is not a function"; return false; }
     lua_insert(L, -(nargs + 1));
-    if (lua_pcall(L, nargs, 0, 0) != 0) { err = lua_tostring(L, -1); lua_pop(L, 1); return false; }
-    return true;
+    int handler = lua_gettop(L) - nargs;
+    lua_pushcfunction(L, withTraceback);
+    lua_insert(L, handler);
+    bool ok = lua_pcall(L, nargs, 0, handler) == 0;
+    if (!ok) { const char* m = lua_tostring(L, -1); err = m ? m : "(error without message)"; lua_pop(L, 1); }
+    lua_remove(L, handler);
+    return ok;
 }
 
 bool Host::loadConfig(const std::string& path, std::string& err) {
