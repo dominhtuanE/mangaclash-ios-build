@@ -15,12 +15,9 @@ namespace ui {
 extern lua_State* g_L;                                   // the game's Lua state (set by registerRes)
 
 // Calls the Lua global RunCallBackFunc(id, ...) (see callbackmanager.lua). id <= 0 does nothing.
-void runCallback(int id, int nargs = 0, double a = 0, double b = 0);
+void runCallback(int id, int nargs = 0, double a = 0, double b = 0, double c = 0);
 float fieldNum(lua_State* L, int idx, const char* key, float def);
 std::string fieldStr(lua_State* L, int idx, const char* key);
-
-// Like runCallback(id, 2, x, y) for a touch-down: false only when the Lua callback returns false (touch not claimed).
-bool runCallbackClaim(int id, double x, double y);
 
 // gzip member at in[pos..] -> out; end = offset just after its trailer (spine.cpp)
 bool gzipPart(const std::string& in, size_t pos, std::string& out, size_t& end);
