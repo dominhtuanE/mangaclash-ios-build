@@ -38,8 +38,7 @@ void rlogTrace(const char* fmt, ...) {                    // file only (no netwo
     char buf[512];
     va_list ap; va_start(ap, fmt); std::vsnprintf(buf, sizeof buf, fmt, ap); va_end(ap);
     std::lock_guard<std::mutex> lk(g_mu);
-    if (!g_file.empty()) { if (FILE* f = std::fopen(g_file.c_str(), "a")) { std::fprintf(f, "%s
-", buf); std::fclose(f); } }
+    if (!g_file.empty()) { if (FILE* f = std::fopen(g_file.c_str(), "a")) { std::fprintf(f, "%s\n", buf); std::fclose(f); } }
 }
 
 std::string rlogTail(int lines) {
