@@ -25,6 +25,7 @@ int touchGroupCreate(lua_State* L) {                     // UITouchGroupEx.Creat
 int createWidgetFromJson(lua_State* L) {                 // ResHelper.CreateWidgetFromJsonFile(path)
     std::string path = luaL_checkstring(L, 1);
     Widget* w = nullptr;
+    rlogTrace("[widget] load %s", path.c_str());
     if (FileUtils::getInstance()->isFileExist(path)) {
         w = cocostudio::GUIReader::getInstance()->widgetFromJsonFile(path.c_str());
     } else {

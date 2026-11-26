@@ -55,6 +55,7 @@ Skel* loadSkel(const std::string& file) {
     auto it = g_skels.find(file);
     if (it != g_skels.end()) return it->second;
     g_skels[file] = nullptr;
+    rlogTrace("[spine] load %s", file.c_str());
     Data d = FileUtils::getInstance()->getDataFromFile(file);
     if (d.isNull()) return nullptr;
     std::string raw(reinterpret_cast<const char*>(d.getBytes()), static_cast<size_t>(d.getSize()));
@@ -93,6 +94,7 @@ Skel* loadSkel(const std::string& file) {
     spSkeletonJson_dispose(sj);
     if (!s->data) { delete s; return nullptr; }
     g_skels[file] = s;
+    rlogTrace("[spine] ok %s", file.c_str());
     return s;
 }
 

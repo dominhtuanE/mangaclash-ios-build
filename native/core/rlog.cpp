@@ -34,6 +34,14 @@ void worker() {
 
 void rlogSetFile(const std::string& path) { std::lock_guard<std::mutex> lk(g_mu); g_file = path; }
 
+void rlogTrace(const char* fmt, ...) {                    // file only (no network): breadcrumbs reported after a crash
+    char buf[512];
+    va_list ap; va_start(ap, fmt); std::vsnprintf(buf, sizeof buf, fmt, ap); va_end(ap);
+    std::lock_guard<std::mutex> lk(g_mu);
+    if (!g_file.empty()) { if (FILE* f = std::fopen(g_file.c_str(), "a")) { std::fprintf(f, "%s
+", buf); std::fclose(f); } }
+}
+
 std::string rlogTail(int lines) {
     std::lock_guard<std::mutex> lk(g_mu);
     std::string out;

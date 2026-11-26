@@ -1,4 +1,5 @@
 #include "AppDelegate.h"
+#include "CrashReport.h"
 
 #include <cstdio>
 
@@ -45,6 +46,7 @@ bool AppDelegate::applicationDidFinishLaunching() {
     mc::ui::setDownloadRoot(FileUtils::getInstance()->getWritablePath() + "resource/");
     std::string cfg = FileUtils::getInstance()->getStringFromFile(dir + "/../config.cnf");
     std::string url = platUrl(cfg);
+    mc::installCrashReport(FileUtils::getInstance()->getWritablePath());   // reports and clears the previous run
     mc::rlogSetFile(FileUtils::getInstance()->getWritablePath() + "mc.log");
     {
         auto* lbl = Label::createWithSystemFont("", "Menlo", 13);
