@@ -19,6 +19,12 @@ void runCallback(int id, int nargs = 0, double a = 0, double b = 0);
 float fieldNum(lua_State* L, int idx, const char* key, float def);
 std::string fieldStr(lua_State* L, int idx, const char* key);
 
+// gzip member at in[pos..] -> out; end = offset just after its trailer (spine.cpp)
+bool gzipPart(const std::string& in, size_t pos, std::string& out, size_t& end);
+
+// Lua animation listener: (animationName, eventType, eventName, intValue, floatValue, stringValue)  (res.cpp)
+void runAnimCallback(int id, const std::string& anim, int type, const std::string& event, int i, double f, const std::string& s);
+
 // Resource layer (res.cpp)
 std::string resolveResFile(const std::string& path);     // real file for "resource/x/y.png" (tries .sdz/.ssdz), "" when missing
 cocos2d::Texture2D* textureFor(const std::string& path);

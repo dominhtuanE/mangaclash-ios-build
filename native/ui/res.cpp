@@ -111,6 +111,41 @@ std::string resolveResFile(const std::string& path) {
     return "";
 }
 
+// .sdz tag 2 = JPEG + gzip(one alpha byte per pixel) (+ 4 bytes). Without the alpha every icon gets a white/black box.
+bool initJpegAlpha(Image* out, const Data& raw) {
+    const unsigned char* p = raw.getBytes();
+    size_t n = static_cast<size_t>(raw.getSize());
+    if (n < 16 || p[0] != 2 || p[1] != 0x0d || p[2] != 0x0e || p[3] != 0x0f) return false;
+    size_t gz = 0;
+    for (size_t i = 6; i + 3 < n; ++i)
+        if (p[i - 2] == 0xff && p[i - 1] == 0xd9 && p[i] == 0x1f && p[i + 1] == 0x8b && p[i + 2] == 0x08) { gz = i; break; }
+    if (!gz) return false;
+    std::string all(reinterpret_cast<const char*>(p), n), alpha;
+    size_t end = 0;
+    if (!gzipPart(all, gz, alpha, end)) return false;
+    Image* jpg = new (std::nothrow) Image();
+    bool ok = false;
+    if (jpg && jpg->initWithImageData(p + 4, static_cast<ssize_t>(gz - 4))) {
+        int w = jpg->getWidth(), h = jpg->getHeight();
+        size_t pixels = static_cast<size_t>(w) * static_cast<size_t>(h);
+        size_t bpp = pixels ? static_cast<size_t>(jpg->getDataLen()) / pixels : 0;
+        if (pixels && alpha.size() == pixels && (bpp == 1 || bpp >= 3)) {
+            std::string rgba(pixels * 4, static_cast<char>(0));
+            const unsigned char* src = jpg->getData();
+            for (size_t k = 0; k < pixels; ++k) {
+                const unsigned char* s = src + k * bpp;
+                rgba[k * 4] = static_cast<char>(s[0]);
+                rgba[k * 4 + 1] = static_cast<char>(bpp >= 3 ? s[1] : s[0]);
+                rgba[k * 4 + 2] = static_cast<char>(bpp >= 3 ? s[2] : s[0]);
+                rgba[k * 4 + 3] = alpha[k];
+            }
+            ok = out->initWithRawData(reinterpret_cast<const unsigned char*>(rgba.data()), static_cast<ssize_t>(rgba.size()), w, h, 8, false);
+        }
+    }
+    if (jpg) jpg->release();
+    return ok;
+}
+
 Texture2D* textureAs(const std::string& key, const std::string& path) {
     std::string file = resolveResFile(path);
     if (file.empty()) { logOnce("image missing: " + path); return nullptr; }
@@ -119,7 +154,7 @@ Texture2D* textureAs(const std::string& key, const std::string& path) {
     Data img = decode(raw);
     Image* image = new (std::nothrow) Image();
     Texture2D* tex = nullptr;
-    if (image && !img.isNull() && image->initWithImageData(img.getBytes(), img.getSize())) tex = Director::getInstance()->getTextureCache()->addImage(image, key);
+    if (image && !img.isNull() && (initJpegAlpha(image, raw) || image->initWithImageData(img.getBytes(), img.getSize()))) tex = Director::getInstance()->getTextureCache()->addImage(image, key);
     else logOnce("image decode failed: " + path);
     if (image) image->release();
     return tex;
@@ -182,6 +217,24 @@ void runCallback(int id, int nargs, double a, double b) {
     if (nargs > 1) lua_pushnumber(L, b);
     if (lua_pcall(L, 1 + nargs, 0, 0) != 0) {
         rlog("[lua] callback %d: %s", id, lua_tostring(L, -1));
+        lua_pop(L, 1);
+    }
+}
+
+void runAnimCallback(int id, const std::string& anim, int type, const std::string& event, int i, double f, const std::string& s) {
+    lua_State* L = g_L;
+    if (!L || id <= 0) return;
+    lua_getglobal(L, "RunCallBackFunc");
+    if (!lua_isfunction(L, -1)) { lua_pop(L, 1); return; }
+    lua_pushnumber(L, id);
+    lua_pushstring(L, anim.c_str());
+    lua_pushnumber(L, type);
+    lua_pushstring(L, event.c_str());
+    lua_pushnumber(L, i);
+    lua_pushnumber(L, f);
+    lua_pushstring(L, s.c_str());
+    if (lua_pcall(L, 7, 0, 0) != 0) {
+        rlog("[lua] animation callback %d: %s", id, lua_tostring(L, -1));
         lua_pop(L, 1);
     }
 }

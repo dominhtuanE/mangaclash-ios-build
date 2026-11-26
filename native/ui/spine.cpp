@@ -10,7 +10,7 @@
 #include "../core/rlog.h"
 #include "../third_party/miniz/miniz.h"
 #include "spine/spine-cocos2dx.h"
-#include "spine/Cocos2dAttachmentLoader.h"
+#include "spine/Cocos2dAttachmentLoader.h"   // see loadSkel
 
 using namespace cocos2d;
 
@@ -129,13 +129,23 @@ int setAnimation(lua_State* L) {                         // SetAnimation(track, 
 int setAnimationListener(lua_State* L) {                 // SetAnimationListener(callbackId): fires when an animation completes
     if (auto* n = sk(L)) {
         int id = static_cast<int>(luaL_checknumber(L, 2));
-        n->setCompleteListener([id](spTrackEntry*) {
-            Director::getInstance()->getScheduler()->performFunctionInCocosThread([id]() { runCallback(id); });   // the callback may delete the node
+        // the callbacks are posted to the next frame: they may delete the node. 2 = ANIMATION_COMPLETE, 3 = ANIMATION_EVENT
+        n->setCompleteListener([id](spTrackEntry* t) {
+            std::string anim = t && t->animation ? t->animation->name : "";
+            Director::getInstance()->getScheduler()->performFunctionInCocosThread([id, anim]() { runAnimCallback(id, anim, 2, "", 0, 0, ""); });
+        });
+        n->setEventListener([id](spTrackEntry* t, spEvent* ev) {
+            std::string anim = t && t->animation ? t->animation->name : "";
+            std::string name = ev && ev->data && ev->data->name ? ev->data->name : "";
+            std::string text = ev && ev->stringValue ? ev->stringValue : "";
+            int i = ev ? ev->intValue : 0;
+            double f = ev ? ev->floatValue : 0;
+            Director::getInstance()->getScheduler()->performFunctionInCocosThread([id, anim, name, i, f, text]() { runAnimCallback(id, anim, 3, name, i, f, text); });
         });
     }
     return 0;
 }
-int clearAnimationListener(lua_State* L) { if (auto* n = sk(L)) n->setCompleteListener(nullptr); return 0; }
+int clearAnimationListener(lua_State* L) { if (auto* n = sk(L)) { n->setCompleteListener(nullptr); n->setEventListener(nullptr); } return 0; }
 int setToSetupPose(lua_State* L) { if (auto* n = sk(L)) spSkeleton_setToSetupPose(n->getSkeleton()); return 0; }
 int setTimeScale(lua_State* L) { if (auto* n = sk(L)) n->getState()->timeScale = static_cast<float>(luaL_checknumber(L, 2)); return 0; }
 int resumeAnimation(lua_State* L) { if (auto* n = sk(L)) n->getState()->timeScale = 1.0f; return 0; }
@@ -232,6 +242,8 @@ void registerSpine(lua_State* L) {
     }
     lua_pop(L, 1);
 }
+
+bool gzipPart(const std::string& in, size_t pos, std::string& out, size_t& end) { return gunzip(in, pos, out, end); }
 
 }  // namespace ui
 }  // namespace mc
