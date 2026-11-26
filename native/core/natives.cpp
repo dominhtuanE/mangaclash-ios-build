@@ -148,11 +148,12 @@ int scAt(lua_State* L) {                                  // unicode_at(str, ind
     lua_pushnumber(L, cp);
     return 1;
 }
-int scSub(lua_State* L) {                                 // unicode_sub(str, start0, count)
+int scSub(lua_State* L) {                                 // unicode_sub(str, start, end): characters [start, end), 0-based
     auto v = utf8Chars(luaL_optstring(L, 1, ""));
-    size_t a = static_cast<size_t>(luaL_optnumber(L, 2, 0)), n = static_cast<size_t>(luaL_optnumber(L, 3, 1 << 20));
+    double from = luaL_optnumber(L, 2, 0), to = luaL_optnumber(L, 3, static_cast<double>(v.size()));
+    size_t a = from > 0 ? static_cast<size_t>(from) : 0, b = to > 0 ? static_cast<size_t>(to) : 0;
     std::string out;
-    for (size_t i = a; i < v.size() && i < a + n; ++i) out += v[i];
+    for (size_t i = a; i < v.size() && i < b; ++i) out += v[i];
     lua_pushstring(L, out.c_str());
     return 1;
 }

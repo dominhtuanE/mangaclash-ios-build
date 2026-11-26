@@ -26,6 +26,43 @@ Sprite* spriteFromArg(lua_State* L, int idx) {          // ImageData table | fil
     return makeSprite(d);
 }
 
+// Image9Label: the centre rectangle is given as fractions of the image (default 0.4, 0.4, 0.2, 0.2). Stretched to a size
+// no larger than the image in both directions it shows that part of the image instead of nine slices.
+class NinePatch : public cocos2d::ui::Scale9Sprite {
+public:
+    static NinePatch* create() {
+        auto* n = new NinePatch();
+        n->init();
+        n->autorelease();
+        return n;
+    }
+    void setSource(Texture2D* tex, const Rect& rect) { source_ = tex; rect_ = rect; apply(); }
+    void setInner(const Rect& fractions) { inner_ = fractions; apply(); }
+    void stretch(float w, float h) { size_ = Size(w, h); stretched_ = true; apply(); }
+
+private:
+    void apply() {
+        if (!source_) { if (stretched_) setContentSize(size_); return; }
+        Size want = stretched_ ? size_ : rect_.size;
+        bool crop = stretched_ && want.width <= rect_.size.width && want.height <= rect_.size.height;
+        Rect part = crop ? Rect(rect_.origin.x, rect_.origin.y, want.width, want.height) : rect_;
+        setSpriteFrame(SpriteFrame::createWithTexture(source_.get(), part));
+        setRenderingType(crop ? RenderingType::SIMPLE : RenderingType::SLICE);
+        if (!crop)
+            setCapInsets(Rect(inner_.origin.x * part.size.width, inner_.origin.y * part.size.height,
+                              inner_.size.width * part.size.width, inner_.size.height * part.size.height));
+        setContentSize(want);
+    }
+    RefPtr<Texture2D> source_;
+    Rect rect_, inner_ = Rect(0.4f, 0.4f, 0.2f, 0.2f);
+    Size size_;
+    bool stretched_ = false;
+};
+
+Rect sourceRect(const ImageData& d, Texture2D* tex) {
+    return d.w > 0 && d.h > 0 ? Rect(d.x, d.y, d.w, d.h) : Rect(0, 0, tex->getContentSize().width, tex->getContentSize().height);
+}
+
 int newImageData(lua_State* L) { lua_newtable(L); return 1; }
 
 int imageLabelCreate(lua_State* L) { pushNode(L, spriteFromArg(L, 1)); return 1; }
@@ -34,11 +71,8 @@ int image9Create(lua_State* L) {                        // Image9Label.CreateWit
     ImageData d = lua_istable(L, 1) ? readImageData(L, 1) : ImageData();
     if (!lua_istable(L, 1) && lua_isstring(L, 1)) d.path = lua_tostring(L, 1);
     Texture2D* tex = d.path.empty() ? nullptr : textureFor(d.path);
-    cocos2d::ui::Scale9Sprite* s = cocos2d::ui::Scale9Sprite::create();
-    if (tex) {
-        Rect r = d.w > 0 && d.h > 0 ? Rect(d.x, d.y, d.w, d.h) : Rect(0, 0, tex->getContentSize().width, tex->getContentSize().height);
-        s->initWithSpriteFrame(SpriteFrame::createWithTexture(tex, r));
-    }
+    NinePatch* s = NinePatch::create();
+    if (tex) s->setSource(tex, sourceRect(d, tex));
     s->setAnchorPoint(Vec2(0.5f, 0.5f));
     pushNode(L, s);
     return 1;
@@ -61,8 +95,9 @@ int setImage(lua_State* L) {                            // SetImage(imageData | 
     else if (lua_isstring(L, 2)) d.path = lua_tostring(L, 2);
     Texture2D* tex = d.path.empty() ? nullptr : textureFor(d.path);
     if (!tex) return 0;
-    Rect r = d.w > 0 && d.h > 0 ? Rect(d.x, d.y, d.w, d.h) : Rect(0, 0, tex->getContentSize().width, tex->getContentSize().height);
-    if (auto* s9 = dynamic_cast<cocos2d::ui::Scale9Sprite*>(s)) s9->setSpriteFrame(SpriteFrame::createWithTexture(tex, r));
+    Rect r = sourceRect(d, tex);
+    if (auto* s9 = dynamic_cast<NinePatch*>(s)) s9->setSource(tex, r);
+    else if (auto* plain = dynamic_cast<cocos2d::ui::Scale9Sprite*>(s)) plain->setSpriteFrame(SpriteFrame::createWithTexture(tex, r));
     else { s->setTexture(tex); s->setTextureRect(r); }
     return 0;
 }
@@ -71,15 +106,16 @@ int stretchTo(lua_State* L) {                           // StretchTo(w, h): fit 
     Sprite* s = spriteSelf(L);
     if (!s) return 0;
     float w = static_cast<float>(luaL_checknumber(L, 2)), h = static_cast<float>(luaL_checknumber(L, 3));
-    if (auto* s9 = dynamic_cast<cocos2d::ui::Scale9Sprite*>(s)) { s9->setContentSize(Size(w, h)); return 0; }
+    if (auto* s9 = dynamic_cast<NinePatch*>(s)) { s9->stretch(w, h); return 0; }
+    if (auto* plain = dynamic_cast<cocos2d::ui::Scale9Sprite*>(s)) { plain->setContentSize(Size(w, h)); return 0; }
     Size cs = s->getContentSize();
     if (cs.width > 0 && cs.height > 0) s->setScale(w / cs.width, h / cs.height);
     return 0;
 }
 
-int setInnerRect(lua_State* L) {                        // 9-slice centre rectangle
-    if (auto* s9 = dynamic_cast<cocos2d::ui::Scale9Sprite*>(toNode(L, 1)))
-        s9->setCapInsets(Rect(static_cast<float>(luaL_checknumber(L, 2)), static_cast<float>(luaL_checknumber(L, 3)),
+int setInnerRect(lua_State* L) {                        // 9-slice centre rectangle, in fractions of the image
+    if (auto* s9 = dynamic_cast<NinePatch*>(toNode(L, 1)))
+        s9->setInner(Rect(static_cast<float>(luaL_checknumber(L, 2)), static_cast<float>(luaL_checknumber(L, 3)),
                               static_cast<float>(luaL_checknumber(L, 4)), static_cast<float>(luaL_checknumber(L, 5))));
     return 0;
 }
@@ -107,7 +143,7 @@ int getWidth(lua_State* L) { Node* n = toNode(L, 1); lua_pushnumber(L, n ? n->ge
 int getHeight(lua_State* L) { Node* n = toNode(L, 1); lua_pushnumber(L, n ? n->getContentSize().height * std::fabs(n->getScaleY()) : 0); return 1; }
 
 // ---- ResHelper: preload the sub-images a widget layout refers to by name ("resource/ui_res/x/name.png")
-std::map<std::string, std::vector<std::string>> g_clipKeys;
+std::map<std::string, std::vector<std::string>> g_clipKeys, g_clipNames;   // texture keys / sprite frame names per atlas
 
 // ResHelper.IsImageExistInCache(path) / LoadAsyncImageFile(path, callbackId): decode on demand, then report back on the next frame
 int noopRes(lua_State*) { return 0; }
@@ -144,6 +180,7 @@ int loadWidgetImageResource(lua_State* L) {
     int sw = src->getWidth(), sh = src->getHeight();
     int bpp = src->hasAlpha() ? 4 : 3;
     std::vector<std::string>& keys = g_clipKeys[path];
+    std::vector<std::string>& names = g_clipNames[path];
     int made = 0;
     int cnt = static_cast<int>(lua_objlen(L, 2));
     for (int i = 1; i <= cnt; ++i) {
@@ -165,8 +202,10 @@ int loadWidgetImageResource(lua_State* L) {
                 Image* img = new (std::nothrow) Image();
                 if (img && img->initWithRawData(buf.data(), static_cast<ssize_t>(buf.size()), w, h, 8)) {
                     std::string key = FileUtils::getInstance()->fullPathForFilename(clip);
-                    Director::getInstance()->getTextureCache()->addImage(img, key);
+                    if (Texture2D* tex = Director::getInstance()->getTextureCache()->addImage(img, key))
+                        SpriteFrameCache::getInstance()->addSpriteFrame(SpriteFrame::createWithTexture(tex, Rect(Vec2::ZERO, tex->getContentSize())), clip);
                     keys.push_back(key);
+                    names.push_back(clip);
                     ++made;
                 }
                 if (img) img->release();
@@ -186,6 +225,8 @@ int releaseWidgetImageResource(lua_State* L) {
     if (it != g_clipKeys.end()) {
         for (auto& k : it->second) Director::getInstance()->getTextureCache()->removeTextureForKey(k);
         g_clipKeys.erase(it);
+        for (auto& n : g_clipNames[path]) SpriteFrameCache::getInstance()->removeSpriteFrameByName(n);
+        g_clipNames.erase(path);
     }
     lua_pushboolean(L, 1);
     return 1;

@@ -2,6 +2,7 @@
 // ResHelper.CreateWidgetFromJsonFile builds the tree with cocostudio::GUIReader.
 #include "ui/CocosGUI.h"
 #include "cocostudio/CocoStudio.h"
+#include "json/document.h"
 
 #include "common.h"
 #include "lua_node.h"
@@ -22,11 +23,46 @@ int touchGroupCreate(lua_State* L) {                     // UITouchGroupEx.Creat
     return 1;
 }
 
+// Every image a layout takes from the sprite frame cache ("resourceType": 1) gets a frame before the loader runs: the
+// image file itself when it exists, otherwise an invisible pixel.
+Texture2D* blankTexture() {
+    auto* cache = Director::getInstance()->getTextureCache();
+    if (Texture2D* t = cache->getTextureForKey("mc.blank")) return t;
+    static const unsigned char clear[4] = {0, 0, 0, 0};
+    Texture2D* tex = nullptr;
+    Image* img = new (std::nothrow) Image();
+    if (img && img->initWithRawData(clear, sizeof clear, 1, 1, 8)) tex = cache->addImage(img, "mc.blank");
+    if (img) img->release();
+    return tex;
+}
+void ensureFrames(const rapidjson::Value& v) {
+    if (v.IsArray()) {
+        for (rapidjson::SizeType i = 0; i < v.Size(); ++i) ensureFrames(v[i]);
+        return;
+    }
+    if (!v.IsObject()) return;
+    if (v.HasMember("resourceType") && v["resourceType"].IsInt() && v["resourceType"].GetInt() == 1 && v.HasMember("path") && v["path"].IsString()) {
+        std::string name = v["path"].GetString();
+        auto* frames = SpriteFrameCache::getInstance();
+        if (!name.empty() && !frames->getSpriteFrameByName(name)) {
+            Texture2D* tex = resolveResFile(name).empty() ? nullptr : textureFor(name);
+            if (!tex) { tex = blankTexture(); rlog("[widget] image not loaded: %s", name.c_str()); }
+            if (tex) frames->addSpriteFrame(SpriteFrame::createWithTexture(tex, Rect(Vec2::ZERO, tex->getContentSize())), name);
+        }
+    }
+    for (auto m = v.MemberBegin(); m != v.MemberEnd(); ++m) ensureFrames(m->value);
+}
+
 int createWidgetFromJson(lua_State* L) {                 // ResHelper.CreateWidgetFromJsonFile(path)
     std::string path = luaL_checkstring(L, 1);
     Widget* w = nullptr;
     rlogTrace("[widget] load %s", path.c_str());
     if (FileUtils::getInstance()->isFileExist(path)) {
+        std::string json = FileUtils::getInstance()->getStringFromFile(path);
+        if (json.compare(0, 3, "\xEF\xBB\xBF") == 0) json.erase(0, 3);
+        rapidjson::Document doc;
+        doc.Parse<0>(json.c_str());
+        if (!doc.HasParseError()) ensureFrames(doc);
         w = cocostudio::GUIReader::getInstance()->widgetFromJsonFile(path.c_str());
     } else {
         rlog("[widget] layout missing: %s", path.c_str());

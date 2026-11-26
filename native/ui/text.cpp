@@ -88,7 +88,13 @@ int editTextCreate(lua_State* L) {
     float w = static_cast<float>(luaL_optnumber(L, 2, 200)), h = static_cast<float>(luaL_optnumber(L, 3, 30));
     float size = static_cast<float>(luaL_optnumber(L, 5, 20));
     cocos2d::ui::TextField* f = cocos2d::ui::TextField::create(hint ? hint : "", g_font, size);
+    f->setAnchorPoint(Vec2::ZERO);                          // as the Android EditText
+    f->ignoreContentAdaptWithSize(false);
     f->setContentSize(Size(w, h));
+    f->setTextHorizontalAlignment(TextHAlignment::LEFT);
+    f->setTextVerticalAlignment(TextVAlignment::CENTER);
+    f->setTouchAreaEnabled(true);
+    f->setTouchSize(Size(w, h));
     pushNode(L, f);
     return 1;
 }
