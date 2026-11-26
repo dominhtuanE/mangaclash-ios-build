@@ -34,14 +34,6 @@ struct TouchState {
 
 int g_downId = 0;                                       // SceneManager:SetLuaTouchDown
 
-// Diagnostics sent to the server log (no personal data: screen positions and node geometry only), capped per run.
-bool traceTouch() {
-    static int left = 150;
-    if (left <= 0) return false;
-    --left;
-    return true;
-}
-
 // visible all the way up, and not touching a part that an enclosing layer has clipped away
 bool reachable(Node* n, const Vec2& world) {
     for (; n; n = n->getParent()) {
@@ -79,11 +71,6 @@ TouchState* stateForNode(Node* node) {
         if (!hits(node, *st, p)) return false;
         st->pressed = true;
         if (image) { st->restore = node->getColor(); node->setColor(Color3B(170, 170, 170)); }    // pressed look
-        if (traceTouch()) {
-            Rect r = hitRect(node, *st);
-            rlog("[touch]  -> %s rect=%.0f,%.0f,%.0fx%.0f swallow=%d cb=%d/%d/%d", image ? "image" : "layer",
-                 r.origin.x, r.origin.y, r.size.width, r.size.height, st->listener->isSwallowTouches() ? 1 : 0, st->down, st->move, st->up);
-        }
         runCallback(st->down, 2, p.x, p.y);
         return true;
     };
@@ -118,7 +105,6 @@ TouchState* stateForWidget(Widget* w) {
         auto call = [](int id, const Vec2& p) { runCallback(id, 2, p.x, p.y); };
         switch (t) {
             case Widget::TouchEventType::BEGAN:
-                if (traceTouch()) rlog("[touch]  -> widget %s cb=%d/%d/%d", w->getName().c_str(), st->down, st->move, st->up);
                 call(st->down, w->getTouchBeganPosition());
                 break;
             case Widget::TouchEventType::MOVED: call(st->move, w->getTouchMovePosition()); break;
@@ -212,9 +198,7 @@ void installSceneTouch() {
     l->setSwallowTouches(true);
     l->onTouchBegan = [](Touch* t, Event*) -> bool {
         Vec2 p = t->getLocation();
-        bool block = sceneTouchBlocks(p.x, p.y);
-        if (traceTouch()) rlog("[touch] %.0f,%.0f%s", p.x, p.y, block ? " blocked by guide" : "");
-        return block;                                    // claimed (and swallowed) only when blocking
+        return sceneTouchBlocks(p.x, p.y);              // claimed (and swallowed) only when blocking
     };
     Director::getInstance()->getEventDispatcher()->addEventListenerWithFixedPriority(l, -1024);
 }

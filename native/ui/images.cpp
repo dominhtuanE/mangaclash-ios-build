@@ -103,8 +103,8 @@ int setNodeColor(lua_State* L) {
     }
     return 0;
 }
-int getWidth(lua_State* L) { Node* n = toNode(L, 1); lua_pushnumber(L, n ? n->getContentSize().width * n->getScaleX() : 0); return 1; }
-int getHeight(lua_State* L) { Node* n = toNode(L, 1); lua_pushnumber(L, n ? n->getContentSize().height * n->getScaleY() : 0); return 1; }
+int getWidth(lua_State* L) { Node* n = toNode(L, 1); lua_pushnumber(L, n ? n->getContentSize().width * std::fabs(n->getScaleX()) : 0); return 1; }
+int getHeight(lua_State* L) { Node* n = toNode(L, 1); lua_pushnumber(L, n ? n->getContentSize().height * std::fabs(n->getScaleY()) : 0); return 1; }
 
 // ---- ResHelper: preload the sub-images a widget layout refers to by name ("resource/ui_res/x/name.png")
 std::map<std::string, std::vector<std::string>> g_clipKeys;

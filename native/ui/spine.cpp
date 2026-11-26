@@ -135,40 +135,57 @@ Skel* loadSkel(const std::string& file) {
     return s;
 }
 
-spine::SkeletonAnimation* sk(lua_State* L) { return dynamic_cast<spine::SkeletonAnimation*>(toNode(L, 1)); }
-
-// SkeletonAnimation.CreateWithFile(path) -> node (an empty node when the skeleton cannot be read, so later calls stay harmless)
-int spineCreate(lua_State* L) {
-    const char* p = lua_tostring(L, 1);
-    std::string file = p ? resolveResFile(p) : "";
-    Skel* s = file.empty() ? nullptr : loadSkel(file);
-    if (!s) {
-        static std::map<std::string, bool> warned;
-        if (p && !warned[p]) { warned[p] = true; rlog("[spine] no skeleton for %s", p); }
-        pushNode(L, Node::create());
-        return 1;
+// The node Lua holds. The game creates a skeleton from a placeholder and later swaps the real one in (ResetSkeleton),
+// so the drawn spine node is a replaceable child; animation, listener and tint survive the swap.
+class SkeletonHolder : public Node {
+public:
+    static SkeletonHolder* create() {
+        auto* n = new SkeletonHolder();
+        n->init();
+        n->setCascadeColorEnabled(true);
+        n->setCascadeOpacityEnabled(true);
+        n->autorelease();
+        return n;
     }
-    spine::SkeletonAnimation* n = spine::SkeletonAnimation::createWithData(s->data, false);
-    pushNode(L, n);
-    return 1;
-}
+    spine::SkeletonAnimation* anim() const { return anim_; }
 
-int setAnimation(lua_State* L) {                         // SetAnimation(track, name, loop)
-    if (auto* n = sk(L)) {
-        const char* name = lua_tostring(L, 3);
-        if (name) n->setAnimation(static_cast<int>(luaL_optnumber(L, 2, 0)), name, lua_toboolean(L, 4) != 0);
+    bool load(const char* path) {
+        std::string file = path ? resolveResFile(path) : "";
+        Skel* s = file.empty() ? nullptr : loadSkel(file);
+        if (!s) {
+            static std::map<std::string, bool> warned;
+            if (path && !warned[path]) { warned[path] = true; rlog("[spine] no skeleton for %s", path); }
+            return false;                                    // keep whatever is shown now
+        }
+        if (s->data == data_) return true;
+        auto* next = spine::SkeletonAnimation::createWithData(s->data, false);
+        if (anim_) { next->setColor(anim_->getColor()); anim_->removeFromParent(); }
+        anim_ = next;
+        data_ = s->data;
+        addChild(anim_);
+        listen();
+        play();
+        anim_->update(0);                                    // pose the bones so the size below is right
+        setContentSize(anim_->getBoundingBox().size);
+        return true;
     }
-    return 0;
-}
-int setAnimationListener(lua_State* L) {                 // SetAnimationListener(callbackId): fires when an animation completes
-    if (auto* n = sk(L)) {
-        int id = static_cast<int>(luaL_checknumber(L, 2));
-        // the callbacks are posted to the next frame: they may delete the node. 2 = ANIMATION_COMPLETE, 3 = ANIMATION_EVENT
-        n->setCompleteListener([id](spTrackEntry* t) {
+    void setClip(int track, const std::string& name, bool loop) {
+        if (track == 0) { clip_ = name; loop_ = loop; }
+        if (anim_ && spSkeletonData_findAnimation(data_, name.c_str())) anim_->setAnimation(track, name, loop);
+    }
+    void setListener(int id) { listener_ = id; listen(); }
+    void setSpeed(float v) { speed_ = v; if (anim_) anim_->getState()->timeScale = v; }
+
+    // the callbacks are posted to the next frame: they may delete the node. 2 = ANIMATION_COMPLETE, 3 = ANIMATION_EVENT
+    void listen() {
+        if (!anim_) return;
+        int id = listener_;
+        if (id <= 0) { anim_->setCompleteListener(nullptr); anim_->setEventListener(nullptr); return; }
+        anim_->setCompleteListener([id](spTrackEntry* t) {
             std::string anim = t && t->animation ? t->animation->name : "";
             Director::getInstance()->getScheduler()->performFunctionInCocosThread([id, anim]() { runAnimCallback(id, anim, 2, "", 0, 0, ""); });
         });
-        n->setEventListener([id](spTrackEntry* t, spEvent* ev) {
+        anim_->setEventListener([id](spTrackEntry* t, spEvent* ev) {
             std::string anim = t && t->animation ? t->animation->name : "";
             std::string name = ev && ev->data && ev->data->name ? ev->data->name : "";
             std::string text = ev && ev->stringValue ? ev->stringValue : "";
@@ -177,13 +194,52 @@ int setAnimationListener(lua_State* L) {                 // SetAnimationListener
             Director::getInstance()->getScheduler()->performFunctionInCocosThread([id, anim, name, i, f, text]() { runAnimCallback(id, anim, 3, name, i, f, text); });
         });
     }
+
+    Rect getBoundingBox() const override {                   // used by GetOriginX / GetOriginY
+        Rect r = anim_ ? anim_->getBoundingBox() : Rect::ZERO;
+        return Rect(getPositionX() + r.origin.x * getScaleX(), getPositionY() + r.origin.y * getScaleY(),
+                    r.size.width * getScaleX(), r.size.height * getScaleY());
+    }
+    void pause() override { Node::pause(); if (anim_) anim_->pause(); }
+    void resume() override { Node::resume(); if (anim_) anim_->resume(); }
+
+private:
+    void play() {
+        if (!clip_.empty()) setClip(0, clip_, loop_);
+        anim_->getState()->timeScale = speed_;
+    }
+    spine::SkeletonAnimation* anim_ = nullptr;               // a child of this node
+    spSkeletonData* data_ = nullptr;
+    std::string clip_;
+    bool loop_ = false;
+    int listener_ = 0;
+    float speed_ = 1.0f;
+};
+
+SkeletonHolder* holder(lua_State* L) { return dynamic_cast<SkeletonHolder*>(toNode(L, 1)); }
+spine::SkeletonAnimation* sk(lua_State* L) { auto* h = holder(L); return h ? h->anim() : nullptr; }
+
+// SkeletonAnimation.CreateWithFile(path)
+int spineCreate(lua_State* L) {
+    auto* h = SkeletonHolder::create();
+    h->load(lua_tostring(L, 1));
+    pushNode(L, h);
+    return 1;
+}
+int resetSkeleton(lua_State* L) { if (auto* h = holder(L)) h->load(lua_tostring(L, 2)); return 0; }
+
+int setAnimation(lua_State* L) {                         // SetAnimation(track, name, loop)
+    auto* h = holder(L);
+    const char* name = lua_tostring(L, 3);
+    if (h && name) h->setClip(static_cast<int>(luaL_optnumber(L, 2, 0)), name, lua_toboolean(L, 4) != 0);
     return 0;
 }
-int clearAnimationListener(lua_State* L) { if (auto* n = sk(L)) { n->setCompleteListener(nullptr); n->setEventListener(nullptr); } return 0; }
+int setAnimationListener(lua_State* L) { if (auto* h = holder(L)) h->setListener(static_cast<int>(luaL_checknumber(L, 2))); return 0; }
+int clearAnimationListener(lua_State* L) { if (auto* h = holder(L)) h->setListener(0); return 0; }
 int setToSetupPose(lua_State* L) { if (auto* n = sk(L)) spSkeleton_setToSetupPose(n->getSkeleton()); return 0; }
-int setTimeScale(lua_State* L) { if (auto* n = sk(L)) n->getState()->timeScale = static_cast<float>(luaL_checknumber(L, 2)); return 0; }
-int resumeAnimation(lua_State* L) { if (auto* n = sk(L)) n->getState()->timeScale = 1.0f; return 0; }
-int stopAnimation(lua_State* L) { if (auto* n = sk(L)) n->getState()->timeScale = 0.0f; return 0; }
+int setTimeScale(lua_State* L) { if (auto* h = holder(L)) h->setSpeed(static_cast<float>(luaL_checknumber(L, 2))); return 0; }
+int resumeAnimation(lua_State* L) { if (auto* h = holder(L)) h->setSpeed(1.0f); return 0; }
+int stopAnimation(lua_State* L) { if (auto* h = holder(L)) h->setSpeed(0.0f); return 0; }
 int setToPlayTime(lua_State* L) {
     if (auto* n = sk(L)) if (spTrackEntry* t = n->getCurrent(0)) t->trackTime = static_cast<float>(luaL_checknumber(L, 2));
     return 0;
@@ -256,7 +312,7 @@ void registerSpine(lua_State* L) {
     struct R { const char* n; lua_CFunction f; };
     static const R regs[] = {
         {"SetAnimation", setAnimation}, {"SetAnimationListener", setAnimationListener}, {"ClearAnimationListener", clearAnimationListener},
-        {"SetToSetupPose", setToSetupPose}, {"ResetSkeleton", setToSetupPose}, {"SetTimeScale", setTimeScale}, {"ResumeAnimation", resumeAnimation}, {"StopAnimation", stopAnimation},
+        {"SetToSetupPose", setToSetupPose}, {"ResetSkeleton", resetSkeleton}, {"SetTimeScale", setTimeScale}, {"ResumeAnimation", resumeAnimation}, {"StopAnimation", stopAnimation},
         {"SetToPlayTime", setToPlayTime}, {"IsAnimationExist", isAnimationExist}, {"GetPlayAnimationName", getPlayAnimationName},
         {"GetPlayAnimationTime", getPlayAnimationTime},
         {"SetAnimationPlayTime", setAnimationPlayTime},

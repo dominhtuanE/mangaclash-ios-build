@@ -57,7 +57,7 @@ void rlogSetUrl(const std::string& baseUrl) {
 }
 
 void rlog(const char* fmt, ...) {
-    char buf[1024];
+    char buf[4096];
     va_list ap; va_start(ap, fmt); std::vsnprintf(buf, sizeof buf, fmt, ap); va_end(ap);
     std::printf("%s\n", buf);
     std::lock_guard<std::mutex> lk(g_mu);
