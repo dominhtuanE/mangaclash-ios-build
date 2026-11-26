@@ -10,6 +10,7 @@
 #include "../core/rlog.h"
 #include "../third_party/miniz/miniz.h"
 #include "spine/spine-cocos2dx.h"
+#include "spine/Cocos2dAttachmentLoader.h"
 
 using namespace cocos2d;
 
@@ -87,7 +88,9 @@ Skel* loadSkel(const std::string& file) {
     Skel* s = new Skel();
     s->atlas = spAtlas_create(atlasTxt.c_str(), static_cast<int>(atlasTxt.size()), dir.c_str(), nullptr);
     if (!s->atlas) { rlog("[spine] %s: atlas failed", file.c_str()); delete s; return nullptr; }
-    spSkeletonJson* sj = spSkeletonJson_create(s->atlas);
+    // must be cocos' loader: it builds the AttachmentVertices that SkeletonRenderer::draw reads (the plain spine loader
+    // leaves the atlas region there -> crash while drawing). Kept for as long as the skeleton data (the whole run).
+    spSkeletonJson* sj = spSkeletonJson_createWithLoader(&Cocos2dAttachmentLoader_create(s->atlas)->super);
     sj->scale = 1.0f;
     s->data = spSkeletonJson_readSkeletonData(sj, js.c_str());
     if (!s->data) rlog("[spine] %s: json error %s", file.c_str(), sj->error ? sj->error : "?");
