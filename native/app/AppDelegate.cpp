@@ -32,7 +32,10 @@ bool AppDelegate::applicationDidFinishLaunching() {
         glview = GLViewImpl::create("MangaClash");
         director->setOpenGLView(glview);
     }
-    glview->setDesignResolutionSize(960, 640, ResolutionPolicy::SHOW_ALL);
+    // like the Android build: fill the whole screen, the Lua side lays itself out from SceneManager:GetSize()
+    // (logic height 640 on wide screens, logic width 960 on 4:3-like screens; its UI scale is min(w/960, h/640))
+    Size frame = glview->getFrameSize();
+    glview->setDesignResolutionSize(960, 640, frame.width / frame.height >= 1.5f ? ResolutionPolicy::FIXED_HEIGHT : ResolutionPolicy::FIXED_WIDTH);
     director->setAnimationInterval(1.0 / 60);
 
     std::string dir = resourceDir_.empty() ? FileUtils::getInstance()->getWritablePath() + "resource" : resourceDir_;
@@ -46,7 +49,7 @@ bool AppDelegate::applicationDidFinishLaunching() {
     {
         auto* lbl = Label::createWithSystemFont("", "Menlo", 13);
         lbl->setAnchorPoint(Vec2(0, 1));
-        lbl->setPosition(Vec2(4, 636));
+        lbl->setPosition(Vec2(4, director->getWinSize().height - 4));
         lbl->setTextColor(Color4B(0, 255, 0, 255));
         lbl->setDimensions(950, 0);
         director->setNotificationNode(lbl);
@@ -61,6 +64,7 @@ bool AppDelegate::applicationDidFinishLaunching() {
 
     host_.reset(new mc::Host());
     host_->writableDir = FileUtils::getInstance()->getWritablePath();
+    mc::setScreenSize(director->getWinSize().width, director->getWinSize().height);
     mc::registerCore(*host_);
     mc::registerNet(*host_);
     mc::ui::registerAll(host_->L());
@@ -70,6 +74,7 @@ bool AppDelegate::applicationDidFinishLaunching() {
     if (!host_->loadConfig(dir + "/../config.cnf", err)) { mc::rlog("[boot] FAIL config: %s", err.c_str()); return false; }
     if (!host_->boot(err)) { mc::rlog("[boot] FAIL main(): %s", err.c_str()); return false; }
     mc::rlog("[boot] main() ok");
+    if (auto* overlay = director->getNotificationNode()) overlay->setVisible(false);   // boot worked: hide the on-screen log (still sent to the server)
     if (!url.empty()) mc::startCdn(host_.get(), url);
     director->getScheduler()->schedule([this](float dt) {
         std::string e;

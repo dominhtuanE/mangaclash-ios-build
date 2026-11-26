@@ -50,10 +50,11 @@ int resSetSetting(lua_State* L) {
 }
 
 // ---- GameLib.SceneManager
+float g_screenW = 960, g_screenH = 640;
 int sceneGetSize(lua_State* L) {          // fills a COCOSize table {width,height} passed as arg 2
     if (lua_istable(L, 2)) {
-        lua_pushnumber(L, 960); lua_setfield(L, 2, "width");
-        lua_pushnumber(L, 640); lua_setfield(L, 2, "height");
+        lua_pushnumber(L, g_screenW); lua_setfield(L, 2, "width");
+        lua_pushnumber(L, g_screenH); lua_setfield(L, 2, "height");
     }
     return 0;
 }
@@ -202,6 +203,8 @@ void sub(lua_State* L, const char* name, std::initializer_list<std::pair<const c
 }
 
 }  // namespace
+
+void setScreenSize(float w, float h) { g_screenW = w; g_screenH = h; }
 
 void registerCore(Host& h) {
     lua_State* L = h.L();

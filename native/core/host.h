@@ -48,6 +48,7 @@ private:
 
 Host* hostOf(lua_State* L);
 void startCdn(Host* h, const std::string& cdn);     // resmgr.cpp: set the resource server at boot
+void setScreenSize(float w, float h);                // natives.cpp: logic size reported to SceneManager:GetSize
 void fillResManager(lua_State* L);                 // resmgr.cpp: GameLib.ResManager + FileVersion
 void registerCore(Host& h);                         // GameLib stubs/natives shared by every platform
 void registerNet(Host& h);                          // MessageAdapter + HTTP bindings
