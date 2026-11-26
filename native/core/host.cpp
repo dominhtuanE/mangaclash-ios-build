@@ -30,7 +30,10 @@ int resourceLoader(lua_State* L) {
     std::string n(name), src;
     bool zc = n.size() > 5 && n.compare(n.size() - 5, 5, ".zcnf") == 0;
     std::string path = h->resourceDir + "/" + n + (zc ? "" : ".cnf");
-    if (!h->writableDir.empty()) { FILE* t = std::fopen(path.c_str(), "rb"); if (t) std::fclose(t); else path = h->writableDir + "resource/" + n + (zc ? "" : ".cnf"); }
+    if (!h->writableDir.empty()) {                          // a downloaded (newer) copy replaces the shipped one
+        std::string dl = h->writableDir + "resource/" + n + (zc ? "" : ".cnf");
+        if (FILE* t = std::fopen(dl.c_str(), "rb")) { std::fclose(t); path = dl; }
+    }
     if (zc) {
         BundleFs fs;
         if (!fs.addBundle(path, "") || !fs.readFirst(src)) { lua_pushfstring(L, "%sno resource file '%s'", "\n\t", path.c_str()); return 1; }

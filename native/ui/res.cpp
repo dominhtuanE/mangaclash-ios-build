@@ -101,7 +101,7 @@ void setDownloadRoot(const std::string& root) { g_dl = root; }
 
 std::string resolveResFile(const std::string& path) {
     std::string rel = path.compare(0, 9, "resource/") == 0 ? path.substr(9) : path;
-    std::string roots[2] = {g_root, g_dl};
+    std::string roots[2] = {g_dl, g_root};                // a downloaded copy replaces the shipped one
     for (const std::string& root : roots) {
         if (root.empty()) continue;
         std::string a = root + rel;
@@ -237,6 +237,24 @@ void runAnimCallback(int id, const std::string& anim, int type, const std::strin
         rlog("[lua] animation callback %d: %s", id, lua_tostring(L, -1));
         lua_pop(L, 1);
     }
+}
+
+bool runCallbackClaim(int id, double x, double y) {
+    lua_State* L = g_L;
+    if (!L || id <= 0) return true;
+    lua_getglobal(L, "RunCallBackFunc");
+    if (!lua_isfunction(L, -1)) { lua_pop(L, 1); return true; }
+    lua_pushnumber(L, id);
+    lua_pushnumber(L, x);
+    lua_pushnumber(L, y);
+    if (lua_pcall(L, 3, 1, 0) != 0) {
+        rlog("[lua] touch callback %d: %s", id, lua_tostring(L, -1));
+        lua_pop(L, 1);
+        return true;
+    }
+    bool claim = !(lua_isboolean(L, -1) && !lua_toboolean(L, -1));
+    lua_pop(L, 1);
+    return claim;
 }
 
 void registerRes(lua_State* L) { g_L = L; }

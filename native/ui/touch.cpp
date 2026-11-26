@@ -36,16 +36,19 @@ TouchState* stateFor(Node* node, bool swallow) {
     node->setUserData(st.get());
     auto* l = EventListenerTouchOneByOne::create();
     l->setSwallowTouches(swallow);
-    l->onTouchBegan = [node, st](Touch* t, Event*) -> bool {
+    l->onTouchBegan = [node, st, l, swallow](Touch* t, Event*) -> bool {
         if (!st->enabled || !node->isRunning() || !visibleInTree(node)) return false;
         if (!st->down && !st->move && !st->up) return false;
         Vec2 p = node->convertToNodeSpace(t->getLocation());
-        Rect r = st->hasRect ? st->rect : Rect(0, 0, node->getContentSize().width, node->getContentSize().height);
-        if (!r.containsPoint(p)) return false;
+        Size size = node->getContentSize();
+        bool fullScreen = !st->hasRect && (size.width <= 0 || size.height <= 0);   // a bare layer receives touches anywhere
+        if (!fullScreen && !(st->hasRect ? st->rect : Rect(0, 0, size.width, size.height)).containsPoint(p)) return false;
+        l->setSwallowTouches(swallow && !fullScreen);        // ... and must not block what lies under it
         st->pressed = true;
         if (st->tint) { st->restore = node->getColor(); node->setColor(Color3B(170, 170, 170)); }
-        runCallback(st->down, 2, p.x, p.y);
-        return true;
+        bool claim = runCallbackClaim(st->down, p.x, p.y);   // a down callback returning false lets the touch pass on
+        if (!claim) { st->pressed = false; if (st->tint) node->setColor(st->restore); }
+        return claim;
     };
     l->onTouchMoved = [node, st](Touch* t, Event*) {
         if (!st->pressed) return;
@@ -67,38 +70,39 @@ TouchState* stateFor(Node* node, bool swallow) {
 
 int num(lua_State* L, int i) { return lua_isnumber(L, i) ? static_cast<int>(lua_tonumber(L, i)) : 0; }
 
+// CocoStudio widgets detect touches themselves: keep the Lua callback ids beside them and forward the widget events.
+TouchState* stateForWidget(cocos2d::ui::Widget* w) {
+    if (w->getUserData()) return static_cast<TouchState*>(w->getUserData());
+    auto st = std::make_shared<TouchState>();                // owned by the listener closure, freed with the widget
+    w->setUserData(st.get());
+    w->setTouchEnabled(true);
+    w->addTouchEventListener([w, st](Ref*, cocos2d::ui::Widget::TouchEventType t) {
+        auto call = [](int id, const Vec2& p) { runCallback(id, 2, p.x, p.y); };
+        switch (t) {
+            case cocos2d::ui::Widget::TouchEventType::BEGAN: call(st->down, w->getTouchBeganPosition()); break;
+            case cocos2d::ui::Widget::TouchEventType::MOVED: call(st->move, w->getTouchMovePosition()); break;
+            case cocos2d::ui::Widget::TouchEventType::ENDED: call(st->up, w->getTouchEndPosition()); break;
+            default: break;
+        }
+    });
+    return st.get();
+}
+
+TouchState* touchState(Node* n) {
+    if (auto* w = dynamic_cast<cocos2d::ui::Widget*>(n)) return stateForWidget(w);
+    TouchState* st = stateFor(n, true);
+    if (dynamic_cast<Sprite*>(n)) st->tint = true;          // image buttons dim while pressed
+    return st;
+}
+
 // SetEventListener(down, move, up): 0 / nil keeps the previous value (the game sets up and down separately)
 int setEventListener(lua_State* L) {
     Node* n = toNode(L, 1);
     if (!n) return 0;
-    int d = num(L, 2), m = num(L, 3), u = num(L, 4);
-    if (auto* w = dynamic_cast<cocos2d::ui::Widget*>(n)) {
-        // CocoStudio widgets handle touches themselves; keep ids in a side state and forward widget events
-        TouchState* st = static_cast<TouchState*>(w->getUserData());
-        if (!st) {
-            st = new TouchState();                       // lives as long as the process; widgets are few and reused
-            w->setUserData(st);
-            w->setTouchEnabled(true);
-            w->addTouchEventListener([w, st](Ref*, cocos2d::ui::Widget::TouchEventType t) {
-                Vec2 p = w->getTouchBeganPosition();
-                switch (t) {
-                    case cocos2d::ui::Widget::TouchEventType::BEGAN: runCallback(st->down, 2, p.x, p.y); break;
-                    case cocos2d::ui::Widget::TouchEventType::MOVED: runCallback(st->move, 2, w->getTouchMovePosition().x, w->getTouchMovePosition().y); break;
-                    case cocos2d::ui::Widget::TouchEventType::ENDED: runCallback(st->up, 2, w->getTouchEndPosition().x, w->getTouchEndPosition().y); break;
-                    default: break;
-                }
-            });
-        }
-        if (d) st->down = d;
-        if (m) st->move = m;
-        if (u) st->up = u;
-        return 0;
-    }
-    TouchState* st = stateFor(n, true);
-    if (d) st->down = d;
-    if (m) st->move = m;
-    if (u) st->up = u;
-    if (dynamic_cast<Sprite*>(n)) st->tint = true;      // image buttons dim while pressed
+    TouchState* st = touchState(n);
+    if (int d = num(L, 2)) st->down = d;
+    if (int m = num(L, 3)) st->move = m;
+    if (int u = num(L, 4)) st->up = u;
     return 0;
 }
 
@@ -122,10 +126,10 @@ int setTouchEnabled(lua_State* L) {
     return 0;
 }
 
-// per-callback setters
-int setDownId(lua_State* L) { if (Node* n = toNode(L, 1)) { int v = num(L, 2); if (!dynamic_cast<cocos2d::ui::Widget*>(n)) stateFor(n, true)->down = v; } return 0; }
-int setMoveId(lua_State* L) { if (Node* n = toNode(L, 1)) { int v = num(L, 2); if (!dynamic_cast<cocos2d::ui::Widget*>(n)) stateFor(n, true)->move = v; } return 0; }
-int setUpId(lua_State* L) { if (Node* n = toNode(L, 1)) { int v = num(L, 2); if (!dynamic_cast<cocos2d::ui::Widget*>(n)) stateFor(n, true)->up = v; } return 0; }
+// per-callback setters (buttons from layout files and plain nodes alike)
+int setDownId(lua_State* L) { if (Node* n = toNode(L, 1)) touchState(n)->down = num(L, 2); return 0; }
+int setMoveId(lua_State* L) { if (Node* n = toNode(L, 1)) touchState(n)->move = num(L, 2); return 0; }
+int setUpId(lua_State* L) { if (Node* n = toNode(L, 1)) touchState(n)->up = num(L, 2); return 0; }
 int noop(lua_State*) { return 0; }
 
 }  // namespace

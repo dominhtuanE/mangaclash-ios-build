@@ -19,7 +19,5 @@
   <key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationLandscapeRight</string><string>UIInterfaceOrientationLandscapeLeft</string></array>
   <key>NSAppTransportSecurity</key><dict><key>NSAllowsArbitraryLoads</key><true/></dict>
   <key>NSLocalNetworkUsageDescription</key><string>MangaClash connects to your game server on the local network.</string>
-  <key>UIFileSharingEnabled</key><true/>
-  <key>LSSupportsOpeningDocumentsInPlace</key><true/>
 </dict>
 </plist>

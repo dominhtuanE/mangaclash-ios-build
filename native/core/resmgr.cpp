@@ -49,9 +49,34 @@ bool statFile(const std::string& p, long* size) {
     return true;
 }
 
+std::string downloadPath(Host& h, const std::string& rel) { return h.writableDir + "resource/" + stripRes(rel); }
+
 bool localFile(Host& h, const std::string& rel, long* size) {
-    if (statFile(h.resourceDir + "/" + stripRes(rel), size)) return true;
-    if (!h.writableDir.empty() && statFile(h.writableDir + "resource/" + stripRes(rel), size)) return true;
+    if (!h.writableDir.empty() && statFile(downloadPath(h, rel), size)) return true;
+    return statFile(h.resourceDir + "/" + stripRes(rel), size);
+}
+
+// A resource path that stays inside resource/ (names come from the network: never let one climb out).
+bool safeName(const std::string& rel) {
+    return !rel.empty() && rel[0] != '/' && rel.find("..") == std::string::npos && rel.find('\\') == std::string::npos;
+}
+
+// Present AND the same size as the server serves (a shipped file can be older than the server's).
+bool upToDate(Host& h, const std::string& rel) {
+    long want = -1;
+    {
+        std::lock_guard<std::mutex> lk(g_mu);
+        auto it = g_remote.find(rel);
+        if (g_remoteLoaded && it != g_remote.end()) want = it->second;
+    }
+    if (want < 0) return localFile(h, rel, nullptr);
+    long have = 0;
+    bool downloaded = !h.writableDir.empty() && statFile(downloadPath(h, rel), &have);
+    if (downloaded && have == want) return true;
+    if (statFile(h.resourceDir + "/" + stripRes(rel), &have) && have == want) {
+        if (downloaded) std::remove(downloadPath(h, rel).c_str());          // a stale download would shadow the good shipped file
+        return true;
+    }
     return false;
 }
 
@@ -196,7 +221,7 @@ int setPlatAndResURL(lua_State* L) {
 int getFileVersionStatus(lua_State* L) {                 // 1 = shipped/downloaded, 3 = must be downloaded, 4 = unknown to the server
     std::string f = luaL_checkstring(L, 2);
     int status = 1;
-    if (!localFile(H(L), f, nullptr)) {
+    if (!upToDate(H(L), f)) {
         std::lock_guard<std::mutex> lk(g_mu);
         status = (!g_remoteLoaded || g_remote.count(f)) ? 3 : 4;
     }
@@ -233,7 +258,7 @@ int updateFileList(lua_State* L) {
         const char* name = lua_tostring(L, -1);
         std::string file = name ? name : "";
         lua_pop(L, 1);
-        if (file.empty()) continue;
+        if (!safeName(file)) continue;
         Task t{file, funcid, 0, timeoutMs};
         { std::lock_guard<std::mutex> lk(g_mu); t.httpId = g_nextHttpId++; }
         if (variantB) {
@@ -241,7 +266,7 @@ int updateFileList(lua_State* L) {
             if (lua_istable(L, 6)) { lua_pushnumber(L, t.httpId); lua_setfield(L, 6, file.c_str()); }
         }
         long size = 0;
-        if (localFile(*h, file, &size)) {
+        if (upToDate(*h, file) && localFile(*h, file, &size)) {
             h->post([h, t, size]() { callDone(h, t, true, 0, size); });
         } else {
             std::lock_guard<std::mutex> lk(g_mu);

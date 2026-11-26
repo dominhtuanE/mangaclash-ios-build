@@ -5,6 +5,10 @@
 #include <map>
 #include <string>
 
+#include "json/document.h"
+#include "json/stringbuffer.h"
+#include "json/writer.h"
+
 #include "common.h"
 #include "lua_node.h"
 #include "../core/rlog.h"
@@ -48,6 +52,35 @@ bool gunzip(const std::string& in, size_t pos, std::string& out, size_t& end) {
     return true;
 }
 
+// Skeletons exported by the old Spine (2.x) used by this game, adapted for the runtime in cocos2d-x 3.17:
+//   boundingbox without "vertexCount" -> the new reader takes it for weighted vertices and reads out of bounds (crash)
+//   "skinnedmesh" / "weightedmesh"    -> "mesh" (weighting is detected from the vertex count)
+void upgradeSkeletonJson(std::string& js) {
+    if (js.find("boundingbox") == std::string::npos && js.find("skinnedmesh") == std::string::npos && js.find("weightedmesh") == std::string::npos) return;
+    rapidjson::Document doc;
+    doc.Parse<0>(js.c_str());
+    if (doc.HasParseError() || !doc.IsObject() || !doc.HasMember("skins") || !doc["skins"].IsObject()) return;
+    auto& alloc = doc.GetAllocator();
+    for (auto skin = doc["skins"].MemberBegin(); skin != doc["skins"].MemberEnd(); ++skin) {
+        if (!skin->value.IsObject()) continue;
+        for (auto slot = skin->value.MemberBegin(); slot != skin->value.MemberEnd(); ++slot) {
+            if (!slot->value.IsObject()) continue;
+            for (auto att = slot->value.MemberBegin(); att != slot->value.MemberEnd(); ++att) {
+                rapidjson::Value& a = att->value;
+                if (!a.IsObject() || !a.HasMember("type") || !a["type"].IsString()) continue;
+                std::string type = a["type"].GetString();
+                if (type == "skinnedmesh" || type == "weightedmesh") a["type"].SetString("mesh", alloc);
+                else if (type == "boundingbox" && !a.HasMember("vertexCount") && a.HasMember("vertices") && a["vertices"].IsArray())
+                    a.AddMember("vertexCount", static_cast<int>(a["vertices"].Size() / 2), alloc);
+            }
+        }
+    }
+    rapidjson::StringBuffer out;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(out);
+    doc.Accept(writer);
+    js.assign(out.GetString(), out.GetSize());
+}
+
 struct Skel { spAtlas* atlas = nullptr; spSkeletonData* data = nullptr; };
 std::map<std::string, Skel*> g_skels;      // by resolved file; kept for the whole run (nodes share the data)
 int g_seq = 0;
@@ -67,6 +100,7 @@ Skel* loadSkel(const std::string& file) {
     std::string js, atlasTxt;
     size_t end = 0, end2 = 0;
     if (!gunzip(raw, e, js, end) || !gunzip(raw, end + 8, atlasTxt, end2)) { rlog("[spine] %s: bad gzip parts", file.c_str()); return nullptr; }
+    upgradeSkeletonJson(js);
     // atlas page file name = first non-empty line
     std::string page;
     size_t a = 0;

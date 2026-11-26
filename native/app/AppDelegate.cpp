@@ -40,9 +40,10 @@ bool AppDelegate::applicationDidFinishLaunching() {
     director->setAnimationInterval(1.0 / 60);
 
     std::string dir = resourceDir_.empty() ? FileUtils::getInstance()->getWritablePath() + "resource" : resourceDir_;
-    FileUtils::getInstance()->addSearchPath(dir);
+    // downloaded files first: they are newer than the ones shipped in the app
     FileUtils::getInstance()->addSearchPath(FileUtils::getInstance()->getWritablePath());
     FileUtils::getInstance()->addSearchPath(FileUtils::getInstance()->getWritablePath() + "resource");
+    FileUtils::getInstance()->addSearchPath(dir);
     mc::ui::setDownloadRoot(FileUtils::getInstance()->getWritablePath() + "resource/");
     std::string cfg = FileUtils::getInstance()->getStringFromFile(dir + "/../config.cnf");
     std::string url = platUrl(cfg);
