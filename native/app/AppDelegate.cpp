@@ -82,6 +82,7 @@ bool AppDelegate::applicationDidFinishLaunching() {
     host_.reset(new mc::Host());
     host_->writableDir = FileUtils::getInstance()->getWritablePath();
     mc::setScreenSize(director->getWinSize().width, director->getWinSize().height);
+    host_->loadSettings(host_->writableDir + "settings.dat");
     mc::registerCore(*host_);
     mc::registerNet(*host_);
     mc::ui::registerAll(host_->L());

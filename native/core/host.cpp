@@ -105,6 +105,40 @@ void Host::post(std::function<void()> fn) {
     posted_.push_back(std::move(fn));
 }
 
+// Settings file: repeated "<keyLength> <valueLength>\n<key><value>", replaced atomically. It lives in the app's private
+// folder (it holds what the Android client keeps there too: account name and login token).
+void Host::loadSettings(const std::string& path) {
+    settingsPath_ = path;
+    std::string data;
+    if (!readFile(path, data)) return;
+    size_t pos = 0;
+    while (pos < data.size()) {
+        size_t eol = data.find('\n', pos);
+        unsigned long k = 0, v = 0;
+        if (eol == std::string::npos || std::sscanf(data.c_str() + pos, "%lu %lu", &k, &v) != 2) break;
+        pos = eol + 1;
+        if (k > data.size() - pos || v > data.size() - pos - k) break;
+        settings_[data.substr(pos, k)] = data.substr(pos + k, v);
+        pos += k + v;
+    }
+}
+
+void Host::saveSettings() const {
+    if (settingsPath_.empty()) return;
+    std::string tmp = settingsPath_ + ".tmp";
+    FILE* f = std::fopen(tmp.c_str(), "wb");
+    if (!f) return;
+    bool ok = true;
+    for (const auto& s : settings_) {
+        ok = ok && std::fprintf(f, "%lu %lu\n", static_cast<unsigned long>(s.first.size()), static_cast<unsigned long>(s.second.size())) > 0
+             && std::fwrite(s.first.data(), 1, s.first.size(), f) == s.first.size()
+             && std::fwrite(s.second.data(), 1, s.second.size(), f) == s.second.size();
+    }
+    ok = std::fclose(f) == 0 && ok;
+    if (ok) std::rename(tmp.c_str(), settingsPath_.c_str());
+    else std::remove(tmp.c_str());
+}
+
 bool Host::loadBundles(const std::string& dir) {
     resourceDir = dir;
     for (int i = 0; i <= 10; ++i)

@@ -29,6 +29,8 @@ public:
     lua_State* L() const { return L_; }
     BundleFs& bundles() { return fs_; }
     std::map<std::string, std::string>& settings() { return settings_; }
+    void loadSettings(const std::string& path);              // reads the store and keeps writing it there
+    void saveSettings() const;
     std::vector<std::string>& missing() { return missing_; }
     std::string platform = "apple";
     std::string writableDir;                        // app Documents/ (downloaded resources go to writableDir/resource/...), ends with '/'
@@ -40,6 +42,7 @@ private:
     lua_State* L_;
     BundleFs fs_;
     std::map<std::string, std::string> settings_;
+    std::string settingsPath_;
     std::vector<std::string> missing_;
     std::mutex mu_;
     std::deque<std::function<void()>> posted_;

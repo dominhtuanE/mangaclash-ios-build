@@ -6,6 +6,7 @@
 #include <cstdlib>
 
 #include "lua_node.h"
+#include "rich_text.h"
 
 using namespace cocos2d;
 
@@ -72,13 +73,13 @@ int fontLabelCreate(lua_State* L) {
     return 1;
 }
 
+RichNode* richOf(lua_State* L) { return dynamic_cast<RichNode*>(toNode(L, 1)); }
+
 // RichText.CreateRichText(width, height, fontName, fontSize); width/height -1 = unconstrained
 int richTextCreate(lua_State* L) {
     float w = static_cast<float>(luaL_optnumber(L, 1, -1));
     float size = static_cast<float>(luaL_optnumber(L, 4, 20));
-    Label* l = makeLabel("", size);
-    if (w > 0) l->setDimensions(w, 0);
-    pushNode(L, l);
+    pushNode(L, RichNode::create(g_font, w, size));
     return 1;
 }
 
@@ -101,6 +102,7 @@ int editTextCreate(lua_State* L) {
 
 int setString(lua_State* L) {
     const char* t = lua_tostring(L, 2);
+    if (RichNode* r = richOf(L)) { r->setText(t ? t : ""); return 0; }
     if (auto* tx = dynamic_cast<cocos2d::ui::Text*>(toNode(L, 1))) { tx->setString(t ? t : ""); return 0; }
     if (auto* bt = dynamic_cast<cocos2d::ui::Button*>(toNode(L, 1))) { bt->setTitleText(t ? t : ""); return 0; }
     if (Label* l = labelOf(L)) {
@@ -117,6 +119,7 @@ int setString(lua_State* L) {
     return 0;
 }
 int getText(lua_State* L) {
+    if (RichNode* r = richOf(L)) { lua_pushstring(L, r->text().c_str()); return 1; }
     if (Label* l = labelOf(L)) lua_pushstring(L, l->getString().c_str());
     else if (auto* f = dynamic_cast<cocos2d::ui::TextField*>(toNode(L, 1))) lua_pushstring(L, f->getString().c_str());
     else lua_pushstring(L, "");
@@ -139,23 +142,29 @@ int setMaxLength(lua_State* L) {
     return 0;
 }
 int setTextWH(lua_State* L) {                            // SetTextWidthAndHeight(w, h) / SetTextWidth(w) / SetTextHeight(h)
+    if (RichNode* r = richOf(L)) { r->setWidth(static_cast<float>(luaL_optnumber(L, 2, -1))); return 0; }
     if (Label* l = labelOf(L)) {
         float w = static_cast<float>(luaL_optnumber(L, 2, 0)), h = static_cast<float>(luaL_optnumber(L, 3, 0));
         l->setDimensions(w, h);
     }
     return 0;
 }
-int setTextW(lua_State* L) { if (Label* l = labelOf(L)) l->setDimensions(static_cast<float>(luaL_optnumber(L, 2, 0)), l->getDimensions().height); return 0; }
+int setTextW(lua_State* L) { if (RichNode* r = richOf(L)) { r->setWidth(static_cast<float>(luaL_optnumber(L, 2, -1))); return 0; } if (Label* l = labelOf(L)) l->setDimensions(static_cast<float>(luaL_optnumber(L, 2, 0)), l->getDimensions().height); return 0; }
 int setTextH(lua_State* L) { if (Label* l = labelOf(L)) l->setDimensions(l->getDimensions().width, static_cast<float>(luaL_optnumber(L, 2, 0))); return 0; }
-int setFontSpacing(lua_State* L) { if (Label* l = labelOf(L)) l->setAdditionalKerning(static_cast<float>(luaL_optnumber(L, 2, 0))); return 0; }
+int setFontSpacing(lua_State* L) { if (RichNode* r = richOf(L)) { r->setSpacing(static_cast<float>(luaL_optnumber(L, 2, 0))); return 0; } if (Label* l = labelOf(L)) l->setAdditionalKerning(static_cast<float>(luaL_optnumber(L, 2, 0))); return 0; }
 int setButtonTextColor(lua_State* L) {
     if (auto* bt = dynamic_cast<cocos2d::ui::Button*>(toNode(L, 1)))
         bt->setTitleColor(Color3B(static_cast<GLubyte>(luaL_checknumber(L, 2)), static_cast<GLubyte>(luaL_checknumber(L, 3)), static_cast<GLubyte>(luaL_checknumber(L, 4))));
     return 0;
 }
 int removeNodeChild(lua_State* L) { Node* n = toNode(L, 1); Node* c = toNode(L, 2); if (n && c) n->removeChild(c, true); return 0; }
-int setStroke(lua_State* L) { if (Label* l = labelOf(L)) applyStroke(l, lua_toboolean(L, 2) != 0); return 0; }
+int setStroke(lua_State* L) { if (RichNode* r = richOf(L)) { r->setStroke(lua_toboolean(L, 2) != 0); return 0; } if (Label* l = labelOf(L)) applyStroke(l, lua_toboolean(L, 2) != 0); return 0; }
 int setStrokeColor(lua_State* L) {
+    if (RichNode* r = richOf(L)) {
+        r->setStrokeColor(Color4B(static_cast<GLubyte>(luaL_checknumber(L, 2)), static_cast<GLubyte>(luaL_checknumber(L, 3)),
+                                  static_cast<GLubyte>(luaL_checknumber(L, 4)), 255));
+        return 0;
+    }
     if (Label* l = labelOf(L))
         l->enableOutline(Color4B(static_cast<GLubyte>(luaL_checknumber(L, 2)), static_cast<GLubyte>(luaL_checknumber(L, 3)),
                                  static_cast<GLubyte>(luaL_checknumber(L, 4)), 255), 2);
@@ -163,11 +172,13 @@ int setStrokeColor(lua_State* L) {
 }
 int setTextColor(lua_State* L) {
     Color3B c(static_cast<GLubyte>(luaL_checknumber(L, 2)), static_cast<GLubyte>(luaL_checknumber(L, 3)), static_cast<GLubyte>(luaL_checknumber(L, 4)));
-    if (Label* l = labelOf(L)) l->setTextColor(Color4B(c));
+    if (RichNode* r = richOf(L)) r->setColorDefault(Color4B(c));
+    else if (Label* l = labelOf(L)) l->setTextColor(Color4B(c));
     else if (auto* f = dynamic_cast<cocos2d::ui::TextField*>(toNode(L, 1))) f->setTextColor(Color4B(c));
     return 0;
 }
 int setFontSize(lua_State* L) {
+    if (RichNode* r = richOf(L)) { r->setFontSize(static_cast<float>(luaL_checknumber(L, 2))); return 0; }
     if (Label* l = labelOf(L)) { TTFConfig cfg = l->getTTFConfig(); cfg.fontSize = static_cast<float>(luaL_checknumber(L, 2)); l->setTTFConfig(cfg); }
     return 0;
 }

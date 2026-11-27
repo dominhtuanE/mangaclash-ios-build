@@ -45,7 +45,9 @@ int resGetSetting(lua_State* L) {
     return 1;
 }
 int resSetSetting(lua_State* L) {
-    H(L).settings()[luaL_checkstring(L, 2)] = luaL_checkstring(L, 3);
+    std::string& slot = H(L).settings()[luaL_checkstring(L, 2)];
+    std::string value = luaL_checkstring(L, 3);
+    if (slot != value) { slot = value; H(L).saveSettings(); }
     return 0;
 }
 

@@ -10,6 +10,7 @@
 
 #include "common.h"
 #include "nine_patch.h"
+#include "rich_text.h"
 #include "lua_node.h"
 #include "register.h"
 #include "../core/rlog.h"
@@ -55,6 +56,14 @@ int imageButtonCreate(lua_State* L) {                   // ImageButton.CreateWit
 Sprite* spriteSelf(lua_State* L) { return dynamic_cast<Sprite*>(toNode(L, 1)); }
 
 int setImage(lua_State* L) {                            // SetImage(imageData | path)
+    // RichText:SetImageData(image, inner x, y, w, h, left, bottom, extra width, extra height): the speech bubble
+    if (auto* rich = dynamic_cast<RichNode*>(toNode(L, 1))) {
+        ImageData d = lua_istable(L, 2) ? readImageData(L, 2) : ImageData();
+        Texture2D* tex = d.path.empty() ? nullptr : textureFor(d.path);
+        auto n = [L](int i, double def) { return static_cast<float>(luaL_optnumber(L, i, def)); };
+        if (tex) rich->setBubble(tex, sourceRect(d, tex), Rect(n(3, 0.4), n(4, 0.4), n(5, 0.2), n(6, 0.2)), Rect(n(7, 0), n(8, 0), n(9, 0), n(10, 0)));
+        return 0;
+    }
     if (auto* iv = dynamic_cast<cocos2d::ui::ImageView*>(toNode(L, 1))) { if (lua_isstring(L, 2)) iv->loadTexture(lua_tostring(L, 2)); return 0; }
     Sprite* s = spriteSelf(L);
     if (!s) return 0;

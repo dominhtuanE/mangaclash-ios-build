@@ -171,7 +171,7 @@ Texture2D* textureFor(const std::string& path) {
     auto it = g_tex.find(path);
     if (it != g_tex.end()) return it->second;
     Texture2D* tex = textureAs(path, path);
-    g_tex[path] = tex;
+    if (tex) g_tex[path] = tex;
     return tex;
 }
 
