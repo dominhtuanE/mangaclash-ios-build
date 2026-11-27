@@ -5,6 +5,8 @@
 #include "cocos2d.h"
 #include "../app/AppDelegate.h"
 
+namespace mc { namespace ui { void purgeIdleSkeletons(double idleSeconds); } }   // ui/spine.cpp
+
 @interface RootViewController : UIViewController
 @end
 
