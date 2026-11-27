@@ -99,7 +99,8 @@ int DeleteMe(lua_State* L) {
 int NU_GetWorldPosition(lua_State* L) {
     Node* n = toNode(L, 1);
     if (!n) { pushPoint(L, 0, 0); return 1; }
-    Vec2 p = n->convertToWorldSpace(Vec2::ZERO);
+    Node* parent = n->getParent();                       // as the Android engine
+    Vec2 p = parent ? parent->convertToWorldSpace(n->getPosition()) : n->convertToWorldSpace(Vec2::ZERO);
     pushPoint(L, p.x, p.y);
     return 1;
 }
@@ -160,15 +161,17 @@ int GetTag(lua_State* L) { lua_pushnumber(L, self(L)->getTag()); return 1; }    
 int GS_Node(lua_State* L) { Node* n = Node::create(); n->setAnchorPoint(Vec2::ZERO); pushNode(L, n); return 1; }
 int GL_Node(lua_State* L) { Node* n = LayerNode::create(); n->setAnchorPoint(Vec2::ZERO); pushNode(L, n); return 1; }
 
-// layer:SetScissorSection[ByLayer](x, y, width, height): clip drawing and touches to this node-space rectangle
-int SetScissorSection(lua_State* L) {
+// layer:SetScissorSection(x, y, w, h) clips to a screen rectangle, SetScissorSectionByLayer to one in layer coordinates
+int scissor(lua_State* L, bool onScreen) {
     if (auto* layer = dynamic_cast<LayerNode*>(self(L))) {
         float x = static_cast<float>(luaL_checknumber(L, 2)), y = static_cast<float>(luaL_checknumber(L, 3));
         float w = static_cast<float>(luaL_checknumber(L, 4)), h = static_cast<float>(luaL_checknumber(L, 5));
-        layer->setSection(Rect(x, y, std::max(w, 0.0f), std::max(h, 0.0f)));
+        layer->setSection(Rect(x, y, std::max(w, 0.0f), std::max(h, 0.0f)), onScreen);
     }
     return 0;
 }
+int SetScissorSection(lua_State* L) { return scissor(L, true); }
+int SetScissorSectionByLayer(lua_State* L) { return scissor(L, false); }
 
 struct Reg { const char* name; lua_CFunction fn; };
 
@@ -203,7 +206,7 @@ void registerNodes(lua_State* L) {
         {"IsObjectActive", IsObjectActive}, {"AddChild", AddChild}, {"AddLayer", AddChild}, {"RemoveLayer", RemoveChild},
         {"SetContentSize", SetContentSize}, {"SetTag", SetTag}, {"GetTag", GetTag}, {"AddNode", AddNode}, {"RemoveChild", RemoveChild},
         {"RemoveSelf", RemoveSelf}, {"RemoveAllChild", RemoveAllChild}, {"DeleteMe", DeleteMe},
-        {"SetScissorSection", SetScissorSection}, {"SetScissorSectionByLayer", SetScissorSection},
+        {"SetScissorSection", SetScissorSection}, {"SetScissorSectionByLayer", SetScissorSectionByLayer},
     };
     luaL_newmetatable(L, kNodeMeta);
     lua_pushvalue(L, -1);

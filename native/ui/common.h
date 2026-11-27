@@ -1,5 +1,6 @@
 #pragma once
 // Shared helpers for the UI layer.
+#include <functional>
 #include <string>
 
 #include "cocos2d.h"
@@ -28,6 +29,7 @@ void runAnimCallback(int id, const std::string& anim, int type, const std::strin
 // Resource layer (res.cpp)
 std::string resolveResFile(const std::string& path);     // real file for "resource/x/y.png" (tries .sdz/.ssdz), "" when missing
 cocos2d::Texture2D* textureFor(const std::string& path);
+void loadTextureAsync(const std::string& path, std::function<void()> done);   // decodes on a worker, done() on the main thread
 cocos2d::Texture2D* textureAs(const std::string& key, const std::string& path);   // decode path, register in the cache under key
 void registerRes(lua_State* L);
 

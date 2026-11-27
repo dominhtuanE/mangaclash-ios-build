@@ -24,6 +24,19 @@ std::string platUrl(const std::string& cfg) {
     }
     return "";
 }
+// One log line per traceback line (the server truncates long requests); the "[string ...]" wrapper is dropped.
+void logLuaError(int frame, const std::string& error) {
+    size_t pos = 0;
+    for (int n = 0; pos < error.size() && n < 14; ++n) {
+        size_t end = error.find('\n', pos);
+        if (end == std::string::npos) end = error.size();
+        std::string line = error.substr(pos, end - pos);
+        pos = end + 1;
+        for (size_t a; (a = line.find("[string \"")) != std::string::npos;) line.erase(a, 9);
+        for (size_t a; (a = line.find("\"]")) != std::string::npos;) line.erase(a, 2);
+        mc::rlog("[lua] frame %d: %s", frame, line.c_str());
+    }
+}
 }  // namespace
 
 bool AppDelegate::applicationDidFinishLaunching() {
@@ -85,7 +98,7 @@ bool AppDelegate::applicationDidFinishLaunching() {
         static size_t seen = 0;
         static int errs = 0;
         ++frame;
-        if (!host_->update(dt, e) && errs++ < 20) mc::rlog("[lua] frame %d: %s", frame, e.c_str());
+        if (!host_->update(dt, e) && errs++ < 20) logLuaError(frame, e);
         auto& miss = host_->missing();
         for (; seen < miss.size(); ++seen) mc::rlog("[missing] %s", miss[seen].c_str());
         if (frame == 1 || frame == 60 || frame == 300) {

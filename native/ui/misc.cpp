@@ -4,6 +4,7 @@
 #include "common.h"
 #include "ui/UIScale9Sprite.h"
 #include "lua_node.h"
+#include "nine_patch.h"
 #include "register.h"
 #include "../core/rlog.h"
 
@@ -53,6 +54,11 @@ Sprite* spriteArg(lua_State* L, int i) {
 }
 void resizeNode(Node* n, float w, float h) {              // w/h < 0: keep. 9-slice resizes, everything else is scaled to the size
     if (!n) return;
+    if (auto* bar = dynamic_cast<Bar9*>(n)) {
+        Size cs = bar->getContentSize();
+        bar->setContentSize(Size(w >= 0 ? w : cs.width, h >= 0 ? h : cs.height));
+        return;
+    }
     if (auto* s9 = dynamic_cast<cocos2d::ui::Scale9Sprite*>(n)) {
         Size cs = s9->getContentSize();
         s9->setContentSize(Size(w >= 0 ? w : cs.width, h >= 0 ? h : cs.height));
@@ -81,17 +87,40 @@ int progressCreate(lua_State* L) {
     return 1;
 }
 
+// Progress9Control.CreateWithImage(bar)
+int bar9Create(lua_State* L) {
+    ImageData d;
+    if (lua_istable(L, 1)) d = readImageData(L, 1);
+    else if (lua_isstring(L, 1)) d.path = lua_tostring(L, 1);
+    Texture2D* tex = d.path.empty() ? nullptr : textureFor(d.path);
+    Rect r = d.w > 0 && d.h > 0 ? Rect(d.x, d.y, d.w, d.h) : tex ? Rect(Vec2::ZERO, tex->getContentSize()) : Rect::ZERO;
+    pushNode(L, Bar9::create(tex, r));
+    return 1;
+}
+
 // ---- StencilContainer
 float g_dummy = 0;
 std::map<Node*, float> g_progMax;
-int setProgress(lua_State* L) {
-    auto* t = dynamic_cast<ProgressTimer*>(toNode(L, 1));
-    if (!t) return 0;
-    float mx = g_progMax.count(t) ? g_progMax[t] : 100.f;
-    t->setPercentage(numAt(L, 2, 0) * 100.f / (mx > 0 ? mx : 100.f));
+float maxOf(Node* n) { auto it = g_progMax.find(n); return it != g_progMax.end() && it->second > 0 ? it->second : 100.f; }
+void showProgress(Node* n, float value) {
+    if (auto* bar = dynamic_cast<Bar9*>(n)) bar->setValue(value);
+    else if (auto* t = dynamic_cast<ProgressTimer*>(n)) t->setPercentage(value * 100.f / maxOf(n));
+}
+// SetProgress / SetToProgress(value) and AddProgress(delta); the Android engine animates the last two, here they jump
+int setProgress(lua_State* L) { if (Node* n = toNode(L, 1)) showProgress(n, numAt(L, 2, 0)); return 0; }
+int addProgress(lua_State* L) {
+    Node* n = toNode(L, 1);
+    if (auto* bar = dynamic_cast<Bar9*>(n)) bar->setValue(bar->value() + numAt(L, 2, 0));
+    else if (auto* t = dynamic_cast<ProgressTimer*>(n)) t->setPercentage(t->getPercentage() + numAt(L, 2, 0) * 100.f / maxOf(n));
     return 0;
 }
-int setProgressMax(lua_State* L) { if (Node* n = toNode(L, 1)) g_progMax[n] = numAt(L, 2, 100); return 0; }
+int setProgressMax(lua_State* L) {
+    Node* n = toNode(L, 1);
+    if (!n) return 0;
+    g_progMax[n] = numAt(L, 2, 100);
+    if (auto* bar = dynamic_cast<Bar9*>(n)) bar->setMax(maxOf(n));
+    return 0;
+}
 
 int stencilNode(lua_State* L) { ClippingNode* c = ClippingNode::create(); c->setAlphaThreshold(0.05f); pushNode(L, c); return 1; }
 int setStencilMask(lua_State* L) {
@@ -142,7 +171,7 @@ void registerMisc(lua_State* L) {
     };
     cls("GraphicLabel", "Node", graphicNode);
     cls("ProgressControl", "CreateWithImage", progressCreate);
-    cls("Progress9Control", "CreateWithImage", progressCreate);
+    cls("Progress9Control", "CreateWithImage", bar9Create);
     cls("StencilContainer", "Node", stencilNode);
     cls("SkeletonAnimation", "CreateWithFile", emptyNode);
     cls("SpineEffect", "CreateWithFile", emptyNode);
@@ -157,7 +186,7 @@ void registerMisc(lua_State* L) {
     struct R { const char* n; lua_CFunction f; };
     static const R regs[] = {
         {"DrawSolidRect", drawSolidRect}, {"DrawRect", drawRect}, {"DrawLine", drawLine}, {"SetLineWidth", setLineWidth},
-        {"RemoveAllNodes", clearNodes}, {"SetProgress", setProgress}, {"SetProgressMax", setProgressMax}, {"SetStencilMask", setStencilMask}, {"SetInverted", setInverted},
+        {"RemoveAllNodes", clearNodes}, {"SetProgress", setProgress}, {"SetToProgress", setProgress}, {"AddProgress", addProgress}, {"SetProgressMax", setProgressMax}, {"SetStencilMask", setStencilMask}, {"SetInverted", setInverted},
         {"SetAlphaTestValue", setAlphaTest}, {"SetContentWidth", setContentWidthM}, {"SetContentHeight", setContentHeightM}, {"SetLuaUpdate", setLuaUpdate},
     };
     for (const R& r : regs) { lua_pushcfunction(L, r.f); lua_setfield(L, -2, r.n); }

@@ -9,6 +9,7 @@
 #include "ui/UIImageView.h"
 
 #include "common.h"
+#include "nine_patch.h"
 #include "lua_node.h"
 #include "register.h"
 #include "../core/rlog.h"
@@ -25,39 +26,6 @@ Sprite* spriteFromArg(lua_State* L, int idx) {          // ImageData table | fil
     if (lua_isstring(L, idx)) d.path = lua_tostring(L, idx);
     return makeSprite(d);
 }
-
-// Image9Label: the centre rectangle is given as fractions of the image (default 0.4, 0.4, 0.2, 0.2). Stretched to a size
-// no larger than the image in both directions it shows that part of the image instead of nine slices.
-class NinePatch : public cocos2d::ui::Scale9Sprite {
-public:
-    static NinePatch* create() {
-        auto* n = new NinePatch();
-        n->init();
-        n->autorelease();
-        return n;
-    }
-    void setSource(Texture2D* tex, const Rect& rect) { source_ = tex; rect_ = rect; apply(); }
-    void setInner(const Rect& fractions) { inner_ = fractions; apply(); }
-    void stretch(float w, float h) { size_ = Size(w, h); stretched_ = true; apply(); }
-
-private:
-    void apply() {
-        if (!source_) { if (stretched_) setContentSize(size_); return; }
-        Size want = stretched_ ? size_ : rect_.size;
-        bool crop = stretched_ && want.width <= rect_.size.width && want.height <= rect_.size.height;
-        Rect part = crop ? Rect(rect_.origin.x, rect_.origin.y, want.width, want.height) : rect_;
-        setSpriteFrame(SpriteFrame::createWithTexture(source_.get(), part));
-        setRenderingType(crop ? RenderingType::SIMPLE : RenderingType::SLICE);
-        if (!crop)
-            setCapInsets(Rect(inner_.origin.x * part.size.width, inner_.origin.y * part.size.height,
-                              inner_.size.width * part.size.width, inner_.size.height * part.size.height));
-        setContentSize(want);
-    }
-    RefPtr<Texture2D> source_;
-    Rect rect_, inner_ = Rect(0.4f, 0.4f, 0.2f, 0.2f);
-    Size size_;
-    bool stretched_ = false;
-};
 
 Rect sourceRect(const ImageData& d, Texture2D* tex) {
     return d.w > 0 && d.h > 0 ? Rect(d.x, d.y, d.w, d.h) : Rect(0, 0, tex->getContentSize().width, tex->getContentSize().height);
@@ -155,8 +123,7 @@ int isImageInCache(lua_State* L) {
 int loadAsyncImageFile(lua_State* L) {
     std::string p = luaL_checkstring(L, 1);
     int id = lua_isnumber(L, 2) ? static_cast<int>(lua_tonumber(L, 2)) : 0;
-    textureFor(p);
-    if (id > 0) Director::getInstance()->getScheduler()->performFunctionInCocosThread([id]() { runCallback(id); });
+    loadTextureAsync(p, [id]() { runCallback(id); });
     return 0;
 }
 
@@ -202,6 +169,7 @@ int loadWidgetImageResource(lua_State* L) {
                 Image* img = new (std::nothrow) Image();
                 if (img && img->initWithRawData(buf.data(), static_cast<ssize_t>(buf.size()), w, h, 8)) {
                     std::string key = FileUtils::getInstance()->fullPathForFilename(clip);
+                    if (key.empty()) key = clip;                 // not a file of its own: the name itself is the key
                     if (Texture2D* tex = Director::getInstance()->getTextureCache()->addImage(img, key))
                         SpriteFrameCache::getInstance()->addSpriteFrame(SpriteFrame::createWithTexture(tex, Rect(Vec2::ZERO, tex->getContentSize())), clip);
                     keys.push_back(key);

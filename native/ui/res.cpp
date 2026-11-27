@@ -1,6 +1,8 @@
 // Resource decoding + the atlas table (ResCompose): "Ui_Res_X" modules are Lua .cnf files that describe rectangles in one big image.
 #include <map>
 #include <set>
+#include <memory>
+#include <thread>
 #include <vector>
 
 #include "common.h"
@@ -166,6 +168,29 @@ Texture2D* textureFor(const std::string& path) {
     Texture2D* tex = textureAs(path, path);
     g_tex[path] = tex;
     return tex;
+}
+
+void loadTextureAsync(const std::string& path, std::function<void()> done) {
+    auto* director = Director::getInstance();
+    std::string file = g_tex.count(path) ? "" : resolveResFile(path);
+    Data raw = file.empty() ? Data() : FileUtils::getInstance()->getDataFromFile(file);
+    if (raw.isNull()) {                                      // cached already, or missing: nothing to decode
+        textureFor(path);
+        director->getScheduler()->performFunctionInCocosThread(done);
+        return;
+    }
+    auto bytes = std::make_shared<Data>(std::move(raw));
+    std::thread([path, bytes, done, director]() {
+        Data img = decode(*bytes);
+        Image* image = new (std::nothrow) Image();
+        bool ok = image && !img.isNull() && (initJpegAlpha(image, *bytes) || image->initWithImageData(img.getBytes(), img.getSize()));
+        director->getScheduler()->performFunctionInCocosThread([path, image, ok, done]() {
+            if (ok && !g_tex.count(path)) g_tex[path] = Director::getInstance()->getTextureCache()->addImage(image, path);
+            else if (!ok) logOnce("image decode failed: " + path);
+            if (image) image->release();
+            done();
+        });
+    }).detach();
 }
 
 float fieldNum(lua_State* L, int idx, const char* key, float def) {
