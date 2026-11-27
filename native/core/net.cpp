@@ -32,6 +32,16 @@ static bool wouldBlock() { return errno == EAGAIN || errno == EWOULDBLOCK || err
 namespace mc {
 namespace {
 
+// A name cut to its fixed-size field can end inside a UTF-8 character; iOS text APIs reject the whole string then.
+void trimUtf8(std::string& s) {
+    size_t n = s.size(), back = 0;
+    while (back < 4 && back < n && (static_cast<unsigned char>(s[n - 1 - back]) & 0xC0) == 0x80) ++back;
+    if (back >= n) return;
+    unsigned char lead = static_cast<unsigned char>(s[n - 1 - back]);
+    size_t need = lead >= 0xF0 ? 4 : lead >= 0xE0 ? 3 : lead >= 0xC0 ? 2 : 1;
+    if (need > 1 && back + 1 < need) s.resize(n - 1 - back);
+}
+
 template <typename T> void put(std::string& b, T v) { b.append(reinterpret_cast<const char*>(&v), sizeof(T)); }   // little-endian hosts only (iOS arm64, x86)
 
 }  // namespace
@@ -90,6 +100,7 @@ bool PacketReader::str(size_t n, std::string& out) {
     pos_ += n;
     size_t z = out.find('\0');
     if (z != std::string::npos) out.resize(z);
+    trimUtf8(out);
     return true;
 }
 bool PacketReader::num(char kind, double& out) {

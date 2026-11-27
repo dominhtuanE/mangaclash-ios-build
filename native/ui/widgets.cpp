@@ -53,6 +53,29 @@ void ensureFrames(const rapidjson::Value& v) {
     for (auto m = v.MemberBegin(); m != v.MemberEnd(); ++m) ensureFrames(m->value);
 }
 
+// The old engine behind these layouts mirrors only a widget's own picture; 3.x Widget::setFlippedX/Y negates the node
+// scale, which also mirrors the children (a flipped speech bubble showed its text upside down).
+void flipPictureOnly(Widget* w) {
+    for (Node* c : w->getChildren())
+        if (auto* cw = dynamic_cast<Widget*>(c)) flipPictureOnly(cw);
+    bool fx = w->isFlippedX(), fy = w->isFlippedY();
+    if (!(fx || fy) || w->getChildrenCount() == 0) return;     // no children: mirroring the node looks the same
+    std::vector<Node*> pictures;
+    if (auto* button = dynamic_cast<cocos2d::ui::Button*>(w))
+        pictures = {button->getRendererNormal(), button->getRendererClicked(), button->getRendererDisabled()};
+    else
+        pictures = {w->getVirtualRenderer()};
+    w->setFlippedX(false);
+    w->setFlippedY(false);
+    for (Node* picture : pictures) {
+        if (picture == w) continue;                             // a panel has no separate picture
+        if (auto* sprite = dynamic_cast<Sprite*>(picture)) {
+            sprite->setFlippedX(fx);
+            sprite->setFlippedY(fy);
+        }
+    }
+}
+
 int createWidgetFromJson(lua_State* L) {                 // ResHelper.CreateWidgetFromJsonFile(path)
     std::string path = luaL_checkstring(L, 1);
     Widget* w = nullptr;
@@ -68,6 +91,7 @@ int createWidgetFromJson(lua_State* L) {                 // ResHelper.CreateWidg
         rlog("[widget] layout missing: %s", path.c_str());
     }
     if (!w) { w = cocos2d::ui::Layout::create(); }
+    flipPictureOnly(w);
     pushNode(L, w);
     return 1;
 }

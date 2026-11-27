@@ -139,7 +139,10 @@ int loadAsyncImageFile(lua_State* L) {
 // ResHelper.ReleaseUnusedImageExcept(...), called by the game on scene changes: drop textures nothing shows any more
 int releaseUnused(lua_State*) {
     Director::getInstance()->getScheduler()->performFunctionInCocosThread(
-        []() { Director::getInstance()->getTextureCache()->removeUnusedTextures(); });   // next frame: nothing is mid-build
+        []() {                                                       // next frame: nothing is mid-build
+            purgeIdleSkeletons(10);
+            Director::getInstance()->getTextureCache()->removeUnusedTextures();
+        });
     return 0;
 }
 int loadImageResource(lua_State* L) { lua_pushboolean(L, textureFor(luaL_checkstring(L, 1)) != nullptr); return 1; }

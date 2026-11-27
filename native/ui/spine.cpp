@@ -1,5 +1,6 @@
 // SkeletonAnimation / SpineEffect on top of cocos2d-x' spine runtime (editor-support/spine).
 // .ssdz = 04 0d 0e 0f + PNG (atlas page) + gzip(Spine JSON) + <u32 jsonLen, u32 gzLen> + gzip(atlas text)   (see server/platform.py _alias_spine_anims)
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <map>
@@ -81,13 +82,29 @@ void upgradeSkeletonJson(std::string& js) {
     js.assign(out.GetString(), out.GetSize());
 }
 
-struct Skel { spAtlas* atlas = nullptr; spSkeletonData* data = nullptr; };
-std::map<std::string, Skel*> g_skels;      // by resolved file; kept for the whole run (nodes share the data)
+// users = nodes drawing the data; a skeleton nobody draws is freed after a while (it used to stay for the whole run,
+// with its atlas texture, so memory only grew until iOS killed the app)
+struct Skel {
+    spAtlas* atlas = nullptr;
+    spAttachmentLoader* loader = nullptr;
+    spSkeletonData* data = nullptr;
+    int users = 0;
+    double lastUse = 0;
+};
+std::map<std::string, Skel*> g_skels;      // by resolved file (nodes share the data)
+std::map<std::string, std::string> g_dirs; // file -> directory holding its extracted atlas page (reused after a reload)
 int g_seq = 0;
+
+double nowSeconds() {
+    return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
 
 Skel* loadSkel(const std::string& file) {
     auto it = g_skels.find(file);
-    if (it != g_skels.end()) return it->second;
+    if (it != g_skels.end()) {
+        if (it->second) it->second->lastUse = nowSeconds();
+        return it->second;
+    }
     g_skels[file] = nullptr;
     rlogTrace("[spine] load %s", file.c_str());
     Data d = FileUtils::getInstance()->getDataFromFile(file);
@@ -114,7 +131,9 @@ Skel* loadSkel(const std::string& file) {
     if (page.empty()) page = "page.png";
     std::string dir = FileUtils::getInstance()->getWritablePath() + "spine_cache";
     FileUtils::getInstance()->createDirectory(dir);
-    dir += "/" + std::to_string(++g_seq);
+    std::string& slot = g_dirs[file];
+    if (slot.empty()) slot = std::to_string(++g_seq);
+    dir += "/" + slot;
     FileUtils::getInstance()->createDirectory(dir);
     std::string pngPath = dir + "/" + page;
     if (FILE* f = std::fopen(pngPath.c_str(), "wb")) { std::fwrite(raw.data() + 4, 1, e - 4, f); std::fclose(f); }
@@ -123,13 +142,15 @@ Skel* loadSkel(const std::string& file) {
     s->atlas = spAtlas_create(atlasTxt.c_str(), static_cast<int>(atlasTxt.size()), dir.c_str(), nullptr);
     if (!s->atlas) { rlog("[spine] %s: atlas failed", file.c_str()); delete s; return nullptr; }
     // must be cocos' loader: it builds the AttachmentVertices that SkeletonRenderer::draw reads (the plain spine loader
-    // leaves the atlas region there -> crash while drawing). Kept for as long as the skeleton data (the whole run).
-    spSkeletonJson* sj = spSkeletonJson_createWithLoader(&Cocos2dAttachmentLoader_create(s->atlas)->super);
+    // leaves the atlas region there -> crash while drawing). Kept for as long as the skeleton data.
+    s->loader = &Cocos2dAttachmentLoader_create(s->atlas)->super;
+    spSkeletonJson* sj = spSkeletonJson_createWithLoader(s->loader);
     sj->scale = 1.0f;
     s->data = spSkeletonJson_readSkeletonData(sj, js.c_str());
     if (!s->data) rlog("[spine] %s: json error %s", file.c_str(), sj->error ? sj->error : "?");
     spSkeletonJson_dispose(sj);
-    if (!s->data) { delete s; return nullptr; }
+    if (!s->data) { spAttachmentLoader_dispose(s->loader); spAtlas_dispose(s->atlas); delete s; return nullptr; }
+    s->lastUse = nowSeconds();
     g_skels[file] = s;
     rlogTrace("[spine] ok %s", file.c_str());
     return s;
@@ -157,8 +178,11 @@ public:
             if (path && !warned[path]) { warned[path] = true; rlog("[spine] no skeleton for %s", path); }
             return false;                                    // keep whatever is shown now
         }
-        if (s->data == data_) return true;
+        if (s == skel_) return true;
         auto* next = spine::SkeletonAnimation::createWithData(s->data, false);
+        release_();
+        skel_ = s;
+        ++s->users;
         if (anim_) { next->setColor(anim_->getColor()); anim_->removeFromParent(); }
         anim_ = next;
         data_ = s->data;
@@ -200,10 +224,18 @@ public:
         return Rect(getPositionX() + r.origin.x * getScaleX(), getPositionY() + r.origin.y * getScaleY(),
                     r.size.width * getScaleX(), r.size.height * getScaleY());
     }
+    ~SkeletonHolder() override { release_(); }
     void pause() override { Node::pause(); if (anim_) anim_->pause(); }
     void resume() override { Node::resume(); if (anim_) anim_->resume(); }
 
 private:
+    void release_() {
+        if (!skel_) return;
+        --skel_->users;
+        skel_->lastUse = nowSeconds();
+        skel_ = nullptr;
+    }
+    Skel* skel_ = nullptr;
     void play() {
         if (!clip_.empty()) setClip(0, clip_, loop_);
         anim_->getState()->timeScale = speed_;
@@ -298,7 +330,31 @@ int sdcTrue(lua_State* L) { lua_pushboolean(L, 1); return 1; }
 
 }  // namespace
 
+// Frees the skeletons no node has drawn for idleSeconds. Call from the main thread between frames only.
+void purgeIdleSkeletons(double idleSeconds) {
+    double now = nowSeconds();
+    int freed = 0;
+    for (auto it = g_skels.begin(); it != g_skels.end();) {
+        Skel* s = it->second;
+        if (!s || s->users > 0 || now - s->lastUse < idleSeconds) { ++it; continue; }
+        spSkeletonData_dispose(s->data);            // its attachments call back into the loader: loader goes after
+        spAttachmentLoader_dispose(s->loader);
+        spAtlas_dispose(s->atlas);                  // releases the atlas texture
+        delete s;
+        it = g_skels.erase(it);
+        ++freed;
+    }
+    if (freed) {
+        Director::getInstance()->getTextureCache()->removeUnusedTextures();
+        rlogTrace("[spine] freed %d idle skeletons", freed);
+    }
+}
+
 void registerSpine(lua_State* L) {
+    static int owner = 0;
+    auto* scheduler = Director::getInstance()->getScheduler();
+    if (!scheduler->isScheduled("mc.skelpurge", &owner))
+        scheduler->schedule([](float) { purgeIdleSkeletons(90); }, &owner, 30.0f, false, "mc.skelpurge");
     for (const char* cls : {"SkeletonAnimation", "SpineEffect"}) {
         lua_getglobal(L, cls);
         if (!lua_istable(L, -1)) { lua_pop(L, 1); lua_newtable(L); }

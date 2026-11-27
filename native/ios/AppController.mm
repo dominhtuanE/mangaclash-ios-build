@@ -49,6 +49,9 @@ static AppDelegate* s_app = nullptr;
 - (void)applicationDidBecomeActive:(UIApplication*)application { cocos2d::Director::getInstance()->resume(); }
 - (void)applicationDidEnterBackground:(UIApplication*)application { cocos2d::Application::getInstance()->applicationDidEnterBackground(); }
 - (void)applicationWillEnterForeground:(UIApplication*)application { cocos2d::Application::getInstance()->applicationWillEnterForeground(); }
-- (void)applicationDidReceiveMemoryWarning:(UIApplication*)application { cocos2d::Director::getInstance()->purgeCachedData(); }
+- (void)applicationDidReceiveMemoryWarning:(UIApplication*)application {
+    mc::ui::purgeIdleSkeletons(2);
+    cocos2d::Director::getInstance()->purgeCachedData();
+}
 
 @end
