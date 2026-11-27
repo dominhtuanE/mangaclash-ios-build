@@ -190,6 +190,14 @@ int getCurPage(lua_State* L) {
     return 1;
 }
 int scrollViewCreate(lua_State* L) { auto* s = cocos2d::ui::ScrollView::create(); s->setAnchorPoint(Vec2::ZERO); pushNode(L, s); return 1; }
+// SetSize(w, h): scroll and list views have no size until the script gives them one (the mailbox stayed empty without it)
+int setSize(lua_State* L) {
+    Node* n = toNode(L, 1);
+    if (!n) return 0;
+    if (auto* w = dynamic_cast<Widget*>(n)) w->ignoreContentAdaptWithSize(false);
+    n->setContentSize(Size(num(L, 2), num(L, 3)));
+    return 0;
+}
 int setScrollDirection(lua_State* L) {
     if (auto* s = dynamic_cast<cocos2d::ui::ScrollView*>(toNode(L, 1))) s->setDirection(static_cast<cocos2d::ui::ScrollView::Direction>(static_cast<int>(num(L, 2, 1))));
     return 0;
@@ -324,7 +332,7 @@ void registerCompat(lua_State* L) {
         {"SetBackGroundColor", setBgColor}, {"SetBackGroundColorType", setBgColorType}, {"SetBackGroundColorOpacity", setBgColorOpacity},
         {"SetBackGroundImage", setBgImage}, {"SetBackGroundImageOpacity", setBgImageOpacity}, {"SetLayoutType", setLayoutType},
         {"SetAliasTexParameters", noop}, {"GetVirtualRenderer", pushSelf},
-        {"GetType", getTimerType}, {"Clear", clearNode}, {"RemoveAllLayer", removeAllLayer}, {"SetTouchEnable", setTouchEnableAlias},
+        {"GetType", getTimerType}, {"Clear", clearNode}, {"RemoveAllLayer", removeAllLayer}, {"removeAllChildren", removeAllLayer}, {"SetSize", setSize}, {"SetTouchEnable", setTouchEnableAlias},
         {"GetOriginX", originX}, {"GetOriginY", originY}, {"SetCycle", noop}, {"setDirty", noop},
     };
     setFields(L, nodes);
