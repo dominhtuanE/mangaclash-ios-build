@@ -138,11 +138,8 @@ int loadWidgetImageResource(lua_State* L) {
     if (file.empty()) { rlog("[res] widget atlas missing: %s", path.c_str()); lua_pushboolean(L, 0); return 1; }
     Data raw = FileUtils::getInstance()->getDataFromFile(file);
     if (raw.isNull()) { lua_pushboolean(L, 0); return 1; }
-    const unsigned char* p = raw.getBytes();
-    ssize_t n = raw.getSize();
-    if (n > 4 && p[1] == 0x0d && p[2] == 0x0e && p[3] == 0x0f && p[0] >= 1 && p[0] <= 4) { p += 4; n -= 4; }
     Image* src = new (std::nothrow) Image();
-    if (!src || !src->initWithImageData(p, n)) { if (src) src->release(); rlog("[res] cannot decode %s", path.c_str()); lua_pushboolean(L, 0); return 1; }
+    if (!src || !loadImage(src, raw)) { if (src) src->release(); rlog("[res] cannot decode %s", path.c_str()); lua_pushboolean(L, 0); return 1; }
     const unsigned char* px = src->getData();
     int sw = src->getWidth(), sh = src->getHeight();
     int bpp = src->hasAlpha() ? 4 : 3;
@@ -167,7 +164,7 @@ int loadWidgetImageResource(lua_State* L) {
                     }
                 }
                 Image* img = new (std::nothrow) Image();
-                if (img && img->initWithRawData(buf.data(), static_cast<ssize_t>(buf.size()), w, h, 8)) {
+                if (img && img->initWithRawData(buf.data(), static_cast<ssize_t>(buf.size()), w, h, 8, src->hasPremultipliedAlpha())) {
                     std::string key = FileUtils::getInstance()->fullPathForFilename(clip);
                     if (key.empty()) key = clip;                 // not a file of its own: the name itself is the key
                     if (Texture2D* tex = Director::getInstance()->getTextureCache()->addImage(img, key))

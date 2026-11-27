@@ -148,15 +148,20 @@ bool initJpegAlpha(Image* out, const Data& raw) {
     return ok;
 }
 
+bool loadImage(Image* out, const Data& raw) {
+    if (initJpegAlpha(out, raw)) return true;
+    Data plain = decode(raw);
+    return !plain.isNull() && out->initWithImageData(plain.getBytes(), plain.getSize());
+}
+
 Texture2D* textureAs(const std::string& key, const std::string& path) {
     std::string file = resolveResFile(path);
     if (file.empty()) { logOnce("image missing: " + path); return nullptr; }
     Data raw = FileUtils::getInstance()->getDataFromFile(file);
     if (raw.isNull()) { logOnce("image unreadable: " + file); return nullptr; }
-    Data img = decode(raw);
     Image* image = new (std::nothrow) Image();
     Texture2D* tex = nullptr;
-    if (image && !img.isNull() && (initJpegAlpha(image, raw) || image->initWithImageData(img.getBytes(), img.getSize()))) tex = Director::getInstance()->getTextureCache()->addImage(image, key);
+    if (image && loadImage(image, raw)) tex = Director::getInstance()->getTextureCache()->addImage(image, key);
     else logOnce("image decode failed: " + path);
     if (image) image->release();
     return tex;
@@ -181,9 +186,8 @@ void loadTextureAsync(const std::string& path, std::function<void()> done) {
     }
     auto bytes = std::make_shared<Data>(std::move(raw));
     std::thread([path, bytes, done, director]() {
-        Data img = decode(*bytes);
         Image* image = new (std::nothrow) Image();
-        bool ok = image && !img.isNull() && (initJpegAlpha(image, *bytes) || image->initWithImageData(img.getBytes(), img.getSize()));
+        bool ok = image && loadImage(image, *bytes);
         director->getScheduler()->performFunctionInCocosThread([path, image, ok, done]() {
             if (ok && !g_tex.count(path)) g_tex[path] = Director::getInstance()->getTextureCache()->addImage(image, path);
             else if (!ok) logOnce("image decode failed: " + path);
