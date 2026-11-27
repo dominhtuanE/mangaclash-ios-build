@@ -72,7 +72,8 @@ bool AppDelegate::applicationDidFinishLaunching() {
         director->getScheduler()->schedule([lbl](float) { lbl->setString(mc::rlogTail(30)); }, lbl, 0.5f, false, "mc.dbg.overlay");
     }
     mc::rlog("[boot] start dir=%s config=%zu bytes plat=%s", dir.c_str(), cfg.size(), url.c_str());
-    if (!url.empty()) mc::rlogSetUrl(url);
+    // the log holds account data: uploaded only by packages built for testing (pack_ios_resources.py --debug-log)
+    if (!url.empty() && cfg.find("mc:remote-log") != std::string::npos) mc::rlogSetUrl(url);
     Size fs = glview->getFrameSize();
     mc::rlog("[boot] frame %.0fx%.0f", fs.width, fs.height);
     mc::ui::setResourceRoot(dir + "/");
@@ -90,7 +91,7 @@ bool AppDelegate::applicationDidFinishLaunching() {
     if (!host_->loadConfig(dir + "/../config.cnf", err)) { mc::rlog("[boot] FAIL config: %s", err.c_str()); return false; }
     if (!host_->boot(err)) { mc::rlog("[boot] FAIL main(): %s", err.c_str()); return false; }
     mc::rlog("[boot] main() ok");
-    if (auto* overlay = director->getNotificationNode()) overlay->setVisible(false);   // boot worked: hide the on-screen log (still sent to the server)
+    if (auto* overlay = director->getNotificationNode()) overlay->setVisible(false);   // boot worked: hide the on-screen log
     if (!url.empty()) mc::startCdn(host_.get(), url);
     director->getScheduler()->schedule([this](float dt) {
         std::string e;
