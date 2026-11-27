@@ -178,11 +178,11 @@ void ext(lua_State* L, const char* cls, std::initializer_list<std::pair<const ch
     lua_pop(L, 1);
 }
 
-int gameRand(lua_State* L) {              // Rand(n) -> [1,n]; Rand(a,b) -> [a,b]; Rand() -> [0,1)
+int gameRand(lua_State* L) {              // Rand(n) -> [1,n]; Rand(a,b) -> [a,b]; Rand() -> integer >= 0
     g_seed = g_seed * 1664525u + 1013904223u;
     double r = (g_seed >> 8) / 16777216.0;
     int n = lua_gettop(L);
-    if (n == 0) lua_pushnumber(L, r);
+    if (n == 0) lua_pushnumber(L, g_seed >> 1);           // like C rand(): scripts do math.mod(GameLib.Rand(), n) + 1
     else if (n == 1) lua_pushnumber(L, 1 + static_cast<int>(r * luaL_checknumber(L, 1)));
     else { double a = luaL_checknumber(L, 1), b = luaL_checknumber(L, 2); lua_pushnumber(L, a + static_cast<int>(r * (b - a + 1))); }
     return 1;
