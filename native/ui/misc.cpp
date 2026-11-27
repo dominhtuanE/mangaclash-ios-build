@@ -146,18 +146,21 @@ int setLuaUpdate(lua_State* L) {
 }
 
 // ---- value types used as constructors from Lua
-int newPoint(lua_State* L) { lua_createtable(L, 0, 2); lua_pushnumber(L, 0); lua_setfield(L, -2, "x"); lua_pushnumber(L, 0); lua_setfield(L, -2, "y"); return 1; }
-int newRect(lua_State* L) {
-    lua_createtable(L, 0, 4);
-    for (const char* k : {"x", "y", "width", "height"}) { lua_pushnumber(L, 0); lua_setfield(L, -2, k); }
+// COCOPoint(x, y), COCORect(x, y, width, height), COCOColor(r, g, b, a): plain tables, missing arguments take the default
+int newValue(lua_State* L, std::initializer_list<const char*> keys, float last) {
+    int n = lua_gettop(L), i = 0, count = static_cast<int>(keys.size());
+    lua_createtable(L, 0, count);
+    for (const char* k : keys) {
+        ++i;
+        double def = i == count ? last : 0;
+        lua_pushnumber(L, i <= n && lua_isnumber(L, i) ? lua_tonumber(L, i) : def);
+        lua_setfield(L, -2, k);
+    }
     return 1;
 }
-int newColor(lua_State* L) {
-    lua_createtable(L, 0, 4);
-    for (const char* k : {"r", "g", "b"}) { lua_pushnumber(L, 0); lua_setfield(L, -2, k); }
-    lua_pushnumber(L, 255); lua_setfield(L, -2, "a");
-    return 1;
-}
+int newPoint(lua_State* L) { return newValue(L, {"x", "y"}, 0); }
+int newRect(lua_State* L) { return newValue(L, {"x", "y", "width", "height"}, 0); }
+int newColor(lua_State* L) { return newValue(L, {"r", "g", "b", "a"}, 255); }
 
 }  // namespace
 

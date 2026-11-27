@@ -63,7 +63,13 @@ int sceneGetSize(lua_State* L) {          // fills a COCOSize table {width,heigh
 int sceneGetScale(lua_State* L) { lua_pushnumber(L, 1.0); return 1; }
 int sceneGetRunningScene(lua_State* L) { lua_newtable(L); markMissingTable(L, "Scene"); return 1; }
 
-int cocosSize(lua_State* L) { lua_newtable(L); lua_pushnumber(L, 0); lua_setfield(L, -2, "width"); lua_pushnumber(L, 0); lua_setfield(L, -2, "height"); return 1; }
+int cocosSize(lua_State* L) {            // COCOSize([width, height])
+    double w = lua_isnumber(L, 1) ? lua_tonumber(L, 1) : 0, h = lua_isnumber(L, 2) ? lua_tonumber(L, 2) : 0;
+    lua_createtable(L, 0, 2);
+    lua_pushnumber(L, w); lua_setfield(L, -2, "width");
+    lua_pushnumber(L, h); lua_setfield(L, -2, "height");
+    return 1;
+}
 
 int getCocosVersion(lua_State* L) { lua_pushnumber(L, 3.2); return 1; }
 int nowMs(lua_State* L) {

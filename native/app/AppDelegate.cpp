@@ -61,7 +61,10 @@ bool AppDelegate::applicationDidFinishLaunching() {
     std::string cfg = FileUtils::getInstance()->getStringFromFile(dir + "/../config.cnf");
     std::string url = platUrl(cfg);
     mc::installCrashReport(FileUtils::getInstance()->getWritablePath());   // reports and clears the previous run
-    mc::rlogSetFile(FileUtils::getInstance()->getWritablePath() + "mc.log");
+    bool testBuild = cfg.find("mc:remote-log") != std::string::npos;    // pack_ios_resources.py --debug-log
+    std::string logFile = FileUtils::getInstance()->getWritablePath() + "mc.log";
+    if (testBuild) mc::rlogSetFile(logFile);
+    else FileUtils::getInstance()->removeFile(logFile);
     {
         auto* lbl = Label::createWithSystemFont("", "Menlo", 13);
         lbl->setAnchorPoint(Vec2(0, 1));
@@ -73,7 +76,7 @@ bool AppDelegate::applicationDidFinishLaunching() {
     }
     mc::rlog("[boot] start dir=%s config=%zu bytes plat=%s", dir.c_str(), cfg.size(), url.c_str());
     // the log holds account data: uploaded only by packages built for testing (pack_ios_resources.py --debug-log)
-    if (!url.empty() && cfg.find("mc:remote-log") != std::string::npos) mc::rlogSetUrl(url);
+    if (!url.empty() && testBuild) mc::rlogSetUrl(url);
     Size fs = glview->getFrameSize();
     mc::rlog("[boot] frame %.0fx%.0f", fs.width, fs.height);
     mc::ui::setResourceRoot(dir + "/");
@@ -92,6 +95,7 @@ bool AppDelegate::applicationDidFinishLaunching() {
     if (!host_->loadConfig(dir + "/../config.cnf", err)) { mc::rlog("[boot] FAIL config: %s", err.c_str()); return false; }
     if (!host_->boot(err)) { mc::rlog("[boot] FAIL main(): %s", err.c_str()); return false; }
     mc::rlog("[boot] main() ok");
+    director->getScheduler()->unschedule("mc.dbg.overlay", director->getNotificationNode());
     if (auto* overlay = director->getNotificationNode()) overlay->setVisible(false);   // boot worked: hide the on-screen log
     if (!url.empty()) mc::startCdn(host_.get(), url);
     director->getScheduler()->schedule([this](float dt) {

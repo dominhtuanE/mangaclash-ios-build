@@ -20,7 +20,6 @@ namespace {
 
 std::string g_root;
 std::string g_dl;                                          // downloaded files: <Documents>/resource/                                       // ".../MangaClash.app/resource/"
-std::map<std::string, Texture2D*> g_tex;
 std::set<std::string> g_loggedMissing;
 std::set<std::string> g_loadedModules;
 
@@ -168,16 +167,14 @@ Texture2D* textureAs(const std::string& key, const std::string& path) {
 }
 
 Texture2D* textureFor(const std::string& path) {
-    auto it = g_tex.find(path);
-    if (it != g_tex.end()) return it->second;
-    Texture2D* tex = textureAs(path, path);
-    if (tex) g_tex[path] = tex;
-    return tex;
+    if (Texture2D* tex = Director::getInstance()->getTextureCache()->getTextureForKey(path)) return tex;
+    return textureAs(path, path);
 }
 
 void loadTextureAsync(const std::string& path, std::function<void()> done) {
     auto* director = Director::getInstance();
-    std::string file = g_tex.count(path) ? "" : resolveResFile(path);
+    bool cached = director->getTextureCache()->getTextureForKey(path) != nullptr;
+    std::string file = cached ? "" : resolveResFile(path);
     Data raw = file.empty() ? Data() : FileUtils::getInstance()->getDataFromFile(file);
     if (raw.isNull()) {                                      // cached already, or missing: nothing to decode
         textureFor(path);
@@ -189,7 +186,7 @@ void loadTextureAsync(const std::string& path, std::function<void()> done) {
         Image* image = new (std::nothrow) Image();
         bool ok = image && loadImage(image, *bytes);
         director->getScheduler()->performFunctionInCocosThread([path, image, ok, done]() {
-            if (ok && !g_tex.count(path)) g_tex[path] = Director::getInstance()->getTextureCache()->addImage(image, path);
+            if (ok) Director::getInstance()->getTextureCache()->addImage(image, path);     // keeps an existing entry
             else if (!ok) logOnce("image decode failed: " + path);
             if (image) image->release();
             done();

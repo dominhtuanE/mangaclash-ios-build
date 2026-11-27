@@ -136,6 +136,12 @@ int loadAsyncImageFile(lua_State* L) {
     return 0;
 }
 
+// ResHelper.ReleaseUnusedImageExcept(...), called by the game on scene changes: drop textures nothing shows any more
+int releaseUnused(lua_State*) {
+    Director::getInstance()->getScheduler()->performFunctionInCocosThread(
+        []() { Director::getInstance()->getTextureCache()->removeUnusedTextures(); });   // next frame: nothing is mid-build
+    return 0;
+}
 int loadImageResource(lua_State* L) { lua_pushboolean(L, textureFor(luaL_checkstring(L, 1)) != nullptr); return 1; }
 
 // LoadWidgetImageResource(image_path, {ImageData{x,y,width,height,clip_image_name}...}): crops each rectangle into its own texture
@@ -215,7 +221,8 @@ void registerImages(lua_State* L) {
     lua_getglobal(L, "GameLib"); lua_getfield(L, -1, "ResHelper"); lua_remove(L, -2);   // global ResHelper only exists after main.lua runs
     if (lua_istable(L, -1)) {
         lua_pushcfunction(L, loadImageResource); lua_setfield(L, -2, "LoadImageResource");
-        for (const char* n : {"ReleaseUnusedImageExcept", "ReleaseImageResource", "PrintAllTextureCache"}) { lua_pushcfunction(L, noopRes); lua_setfield(L, -2, n); }
+        for (const char* n : {"ReleaseImageResource", "PrintAllTextureCache"}) { lua_pushcfunction(L, noopRes); lua_setfield(L, -2, n); }
+        lua_pushcfunction(L, releaseUnused); lua_setfield(L, -2, "ReleaseUnusedImageExcept");
         lua_pushcfunction(L, isImageInCache); lua_setfield(L, -2, "IsImageExistInCache");
         lua_pushcfunction(L, loadAsyncImageFile); lua_setfield(L, -2, "LoadAsyncImageFile");
         lua_pushcfunction(L, loadWidgetImageResource); lua_setfield(L, -2, "LoadWidgetImageResource");
