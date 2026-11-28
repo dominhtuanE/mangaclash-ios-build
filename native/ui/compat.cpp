@@ -71,30 +71,12 @@ GLProgramState* brightStateImpl(float value) {
     static std::map<float, GLProgramState*> states;
     if (!prog) {
         const char* vs =
-            "attribute vec4 a_position;
-attribute vec2 a_texCoord;
-attribute vec4 a_color;
-"
-            "#ifdef GL_ES
-varying lowp vec4 v_c;
-varying mediump vec2 v_t;
-#else
-varying vec4 v_c;
-varying vec2 v_t;
-#endif
-"
-            "void main() { gl_Position = CC_PMatrix * a_position; v_c = a_color; v_t = a_texCoord; }
-";
+            "attribute vec4 a_position;\nattribute vec2 a_texCoord;\nattribute vec4 a_color;\n"
+            "#ifdef GL_ES\nvarying lowp vec4 v_c;\nvarying mediump vec2 v_t;\n#else\nvarying vec4 v_c;\nvarying vec2 v_t;\n#endif\n"
+            "void main() { gl_Position = CC_PMatrix * a_position; v_c = a_color; v_t = a_texCoord; }\n";
         const char* fs =
-            "#ifdef GL_ES
-precision mediump float;
-#endif
-varying vec4 v_c;
-varying vec2 v_t;
-uniform float u_bright;
-"
-            "void main() { vec4 c = v_c * texture2D(CC_Texture0, v_t); gl_FragColor = vec4(c.rgb * u_bright, c.a); }
-";
+            "#ifdef GL_ES\nprecision mediump float;\n#endif\nvarying vec4 v_c;\nvarying vec2 v_t;\nuniform float u_bright;\n"
+            "void main() { vec4 c = v_c * texture2D(CC_Texture0, v_t); gl_FragColor = vec4(c.rgb * u_bright, c.a); }\n";
         prog = GLProgram::createWithByteArrays(vs, fs);
         if (!prog) return nullptr;
         prog->retain();

@@ -17,7 +17,7 @@ cp "$LIB" build/libcocos2d_ios.a
 # 2) app (CMake -> Xcode)
 cmake -S native -B build/ios -G Xcode -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
   -DCOCOS2DX_ROOT="$ENG" -DMC_COCOS_LIB="$ROOT/build/libcocos2d_ios.a" > out/cmake.log 2>&1 || { tail -60 out/cmake.log; exit 1; }
-xcodebuild -project build/ios/MangaClash.xcodeproj -target MangaClash -configuration Release "${COMMON[@]}" \
+xcodebuild -project build/ios/MangaClash.xcodeproj -target MangaClash -configuration Release -IDEBuildingContinueBuildingAfterErrors=YES "${COMMON[@]}" \
   SYMROOT="$ROOT/build/products" OTHER_CFLAGS='$(inherited) -Wno-error' build > out/build.log 2>&1
 RC=$?
 grep -E "error:|BUILD (SUCCEEDED|FAILED)" out/build.log | sort -u | head -80
