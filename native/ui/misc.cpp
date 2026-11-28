@@ -30,6 +30,15 @@ int drawSolidRect(lua_State* L) {
     }
     return 0;
 }
+int drawSolidTriangle(lua_State* L) {                    // (point, point, point, r, g, b, a): hero ability chart
+    if (DrawNode* d = dn(L)) {
+        Vec2 p[3];
+        for (int i = 0; i < 3; ++i)
+            if (lua_istable(L, 2 + i)) p[i] = Vec2(fieldNum(L, 2 + i, "x", 0), fieldNum(L, 2 + i, "y", 0));
+        d->drawTriangle(p[0], p[1], p[2], colorAt(L, 5));
+    }
+    return 0;
+}
 int drawRect(lua_State* L) {
     if (DrawNode* d = dn(L)) {
         float x = numAt(L, 2, 0), y = numAt(L, 3, 0), w = numAt(L, 4, 0), h = numAt(L, 5, 0);
@@ -188,7 +197,7 @@ void registerMisc(lua_State* L) {
     luaL_getmetatable(L, kNodeMeta);
     struct R { const char* n; lua_CFunction f; };
     static const R regs[] = {
-        {"DrawSolidRect", drawSolidRect}, {"DrawRect", drawRect}, {"DrawLine", drawLine}, {"SetLineWidth", setLineWidth},
+        {"DrawSolidRect", drawSolidRect}, {"DrawRect", drawRect}, {"DrawSolidTriangle", drawSolidTriangle}, {"DrawLine", drawLine}, {"SetLineWidth", setLineWidth},
         {"RemoveAllNodes", clearNodes}, {"SetProgress", setProgress}, {"SetToProgress", setProgress}, {"AddProgress", addProgress}, {"SetProgressMax", setProgressMax}, {"SetStencilMask", setStencilMask}, {"SetInverted", setInverted},
         {"SetAlphaTestValue", setAlphaTest}, {"SetContentWidth", setContentWidthM}, {"SetContentHeight", setContentHeightM}, {"SetLuaUpdate", setLuaUpdate},
     };

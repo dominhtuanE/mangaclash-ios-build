@@ -7,6 +7,7 @@
 // Callback ids refer to Lua functions run through RunCallBackFunc.
 #include <memory>
 
+#include "base/CCRefPtr.h"
 #include "ui/UIWidget.h"
 
 #include "common.h"
@@ -28,7 +29,7 @@ struct TouchState {
     Rect rect;
     bool enabled = true;
     bool pressed = false;
-    Color3B restore = Color3B::WHITE;
+    RefPtr<GLProgramState> restore;                     // the picture's shader while it shows the pressed look
     EventListenerTouchOneByOne* listener = nullptr;     // owned by the event dispatcher; null for widgets
 };
 
@@ -70,7 +71,9 @@ TouchState* stateForNode(Node* node) {
         Vec2 p = node->convertToNodeSpace(t->getLocation());
         if (!hits(node, *st, p)) return false;
         st->pressed = true;
-        if (image) { st->restore = node->getColor(); node->setColor(Color3B(170, 170, 170)); }    // pressed look
+        if (image) {                                    // pressed look of the Android ImageButton: brighter
+            if (GLProgramState* bright = brightState(1.6f)) { st->restore = node->getGLProgramState(); node->setGLProgramState(bright); }
+        }
         runCallback(st->down, 2, p.x, p.y);
         return true;
     };
@@ -83,7 +86,10 @@ TouchState* stateForNode(Node* node) {
         if (!st->pressed) return;
         st->pressed = false;
         bool image = isImage(node);
-        if (image) node->setColor(st->restore);
+        if (st->restore) {                              // unless it was greyed meanwhile
+            if (node->getGLProgramState() == brightState(1.6f)) node->setGLProgramState(st->restore.get());
+            st->restore = nullptr;
+        }
         Vec2 p = node->convertToNodeSpace(t->getLocation());
         bool inside = hits(node, *st, p);
         if (cancelled || (image && !inside)) runCallback(st->cancel, 2, p.x, p.y);

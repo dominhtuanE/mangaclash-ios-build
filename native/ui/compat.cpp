@@ -65,6 +65,55 @@ GLProgramState* greyState() {
     }
     return GLProgramState::getOrCreateWithGLProgram(prog);
 }
+// The Android engine's "high light": the picture's colours times 1.6 (Image9Label::SetBright), alpha untouched.
+GLProgramState* brightStateImpl(float value) {
+    static GLProgram* prog = nullptr;
+    static std::map<float, GLProgramState*> states;
+    if (!prog) {
+        const char* vs =
+            "attribute vec4 a_position;
+attribute vec2 a_texCoord;
+attribute vec4 a_color;
+"
+            "#ifdef GL_ES
+varying lowp vec4 v_c;
+varying mediump vec2 v_t;
+#else
+varying vec4 v_c;
+varying vec2 v_t;
+#endif
+"
+            "void main() { gl_Position = CC_PMatrix * a_position; v_c = a_color; v_t = a_texCoord; }
+";
+        const char* fs =
+            "#ifdef GL_ES
+precision mediump float;
+#endif
+varying vec4 v_c;
+varying vec2 v_t;
+uniform float u_bright;
+"
+            "void main() { vec4 c = v_c * texture2D(CC_Texture0, v_t); gl_FragColor = vec4(c.rgb * u_bright, c.a); }
+";
+        prog = GLProgram::createWithByteArrays(vs, fs);
+        if (!prog) return nullptr;
+        prog->retain();
+    }
+    auto it = states.find(value);
+    if (it != states.end()) return it->second;
+    GLProgramState* st = GLProgramState::create(prog);
+    st->setUniformFloat("u_bright", value);
+    st->retain();
+    states[value] = st;
+    return st;
+}
+void applyShader(Node* n, GLProgramState* st) {          // a node and the pictures under it; nullptr: back to normal
+    if (!n) return;
+    Sprite* s = dynamic_cast<Sprite*>(n);
+    if (!s) if (auto* w = dynamic_cast<Widget*>(n)) s = dynamic_cast<Sprite*>(w->getVirtualRenderer());
+    if (s) s->setGLProgramState(st ? st : GLProgramState::getOrCreateWithGLProgramName(GLProgram::SHADER_NAME_POSITION_TEXTURE_COLOR_NO_MVP));
+    for (Node* c : n->getChildren()) applyShader(c, st);
+}
 void applyGrey(Node* n, bool grey) {
     if (!n) return;
     if (dynamic_cast<spine::SkeletonAnimation*>(n)) { n->setColor(grey ? Color3B(110, 110, 110) : Color3B::WHITE); return; }
@@ -78,14 +127,8 @@ void applyGrey(Node* n, bool grey) {
     for (Node* c : n->getChildren()) applyGrey(c, grey);
 }
 int setGrey(lua_State* L) { applyGrey(toNode(L, 1), flag(L, 2)); return 0; }
-int setHighLight(lua_State* L) {
-    if (auto* s = dynamic_cast<Sprite*>(toNode(L, 1))) {
-        static std::map<Sprite*, BlendFunc> saved;
-        if (flag(L, 2)) { if (!saved.count(s)) saved[s] = s->getBlendFunc(); s->setBlendFunc(BlendFunc::ADDITIVE); }
-        else if (saved.count(s)) { s->setBlendFunc(saved[s]); saved.erase(s); }
-    }
-    return 0;
-}
+int setHighLight(lua_State* L) { applyShader(toNode(L, 1), flag(L, 2) ? brightStateImpl(1.6f) : nullptr); return 0; }
+int setBrightValue(lua_State* L) { applyShader(toNode(L, 1), brightStateImpl(num(L, 2, 1))); return 0; }
 
 // ---------------------------------------------------------------- buttons
 int setEnabledM(lua_State* L) {
@@ -103,7 +146,7 @@ int setNormalImage(lua_State* L) {
 }
 int setSelectedImage(lua_State* L) {
     if (auto* b = dynamic_cast<cocos2d::ui::Button*>(toNode(L, 1))) if (lua_isstring(L, 2)) b->loadTexturePressed(lua_tostring(L, 2));
-    return 0;                                            // plain image buttons show the pressed state by dimming (touch.cpp)
+    return 0;                                            // plain image buttons show the pressed state by brightening (touch.cpp)
 }
 int pushSelf(lua_State* L) { lua_pushvalue(L, 1); return 1; }   // GetNormalImageNode & co: our image button is one sprite
 int setPressedAction(lua_State* L) { if (auto* b = dynamic_cast<cocos2d::ui::Button*>(toNode(L, 1))) b->setPressedActionEnabled(flag(L, 2)); return 0; }
@@ -127,6 +170,11 @@ int setShadow(lua_State* L) {
         if (flag(L, 2)) l->enableShadow(Color4B(0, 0, 0, 200), Size(2, -2));
         else l->disableEffect(LabelEffect::SHADOW);
     }
+    return 0;
+}
+int setShadowColor(lua_State* L) {                     // SetShadowColor(r, g, b, a)
+    if (Label* l = labelNode(toNode(L, 1)))
+        l->enableShadow(Color4B(byteArg(L, 2), byteArg(L, 3), byteArg(L, 4), byteArg(L, 5)), Size(2, -2));
     return 0;
 }
 int disableEffect(lua_State* L) { if (Label* l = labelNode(toNode(L, 1))) l->disableEffect(); return 0; }
@@ -322,7 +370,7 @@ void registerCompat(lua_State* L) {
         {"SetNormalImage", setNormalImage}, {"SetSelectedImage", setSelectedImage}, {"GetNormalImageNode", pushSelf},
         {"GetSelectedImageNode", pushSelf}, {"GetDisableImageNode", pushSelf}, {"SetDisableButtonTextColor", noop},
         {"SetPressedActionEnabled", setPressedAction}, {"SetOutline", setOutline}, {"SetTouchDownOverLap", noop},
-        {"SetShadow", setShadow}, {"DisableEffect", disableEffect}, {"SetHolderText", setHolderText}, {"SetExpand", noop},
+        {"SetShadow", setShadow}, {"SetShadowColor", setShadowColor}, {"DisableEffect", disableEffect}, {"SetHolderText", setHolderText}, {"SetExpand", noop},
         {"SetTextAreaSize", setTextAreaSize}, {"SetTextHorizontalAlign", setTextHAlign},
         {"GetItem", getItem}, {"GetIndex", getIndex}, {"RefreshView", refreshView}, {"PushBackCustomItem", pushBackItem},
         {"RemoveAllItems", removeAllItems}, {"AddEventListener", noop},
@@ -339,7 +387,7 @@ void registerCompat(lua_State* L) {
     lua_pop(L, 1);
 
     globalTable(L, "NodeUnity");
-    { static const R f[] = {{"SetGreyShader", setGrey}}; setFields(L, f); }       // static form: (node, bool)
+    { static const R f[] = {{"SetGreyShader", setGrey}, {"SetBrightShader", setHighLight}, {"SetBrightValue", setBrightValue}}; setFields(L, f); }       // static form: (node, bool / value)
     lua_pop(L, 1);
     gameLibTable(L, "MsgPush");
     { static const R f[] = {{"SetTag", noop}}; setFields(L, f); }                 // push notifications: none on this build
@@ -393,6 +441,8 @@ void registerCompat(lua_State* L) {
     }
     lua_pop(L, 1);
 }
+
+cocos2d::GLProgramState* brightState(float value) { return brightStateImpl(value); }
 
 }  // namespace ui
 }  // namespace mc

@@ -116,17 +116,25 @@ std::string resolveResFile(const std::string& path) {
 bool initJpegAlpha(Image* out, const Data& raw) {
     const unsigned char* p = raw.getBytes();
     size_t n = static_cast<size_t>(raw.getSize());
-    if (n < 16 || p[0] != 2 || p[1] != 0x0d || p[2] != 0x0e || p[3] != 0x0f) return false;
+    if (n < 16) return false;
+    bool tagged = p[0] == 2 && p[1] == 0x0d && p[2] == 0x0e && p[3] == 0x0f;
+    // the particle textures are the same without the tag; they end with the length of the gzip part
+    if (!tagged && !(p[0] == 0xff && p[1] == 0xd8)) return false;
+    size_t start = tagged ? 4 : 0;
     size_t gz = 0;
     for (size_t i = 6; i + 3 < n; ++i)
         if (p[i - 2] == 0xff && p[i - 1] == 0xd9 && p[i] == 0x1f && p[i + 1] == 0x8b && p[i + 2] == 0x08) { gz = i; break; }
     if (!gz) return false;
+    if (!tagged) {
+        size_t said = static_cast<size_t>(p[n - 4]) | static_cast<size_t>(p[n - 3]) << 8 | static_cast<size_t>(p[n - 2]) << 16 | static_cast<size_t>(p[n - 1]) << 24;
+        if (said != n - 4 - gz) return false;
+    }
     std::string all(reinterpret_cast<const char*>(p), n), alpha;
     size_t end = 0;
     if (!gzipPart(all, gz, alpha, end)) return false;
     Image* jpg = new (std::nothrow) Image();
     bool ok = false;
-    if (jpg && jpg->initWithImageData(p + 4, static_cast<ssize_t>(gz - 4))) {
+    if (jpg && jpg->initWithImageData(p + start, static_cast<ssize_t>(gz - start))) {
         int w = jpg->getWidth(), h = jpg->getHeight();
         size_t pixels = static_cast<size_t>(w) * static_cast<size_t>(h);
         size_t bpp = pixels ? static_cast<size_t>(jpg->getDataLen()) / pixels : 0;

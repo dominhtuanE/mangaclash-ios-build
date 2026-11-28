@@ -103,7 +103,13 @@ int editTextCreate(lua_State* L) {
 int setString(lua_State* L) {
     const char* t = lua_tostring(L, 2);
     if (RichNode* r = richOf(L)) { r->setText(t ? t : ""); return 0; }
-    if (auto* tx = dynamic_cast<cocos2d::ui::Text*>(toNode(L, 1))) { tx->setString(t ? t : ""); return 0; }
+    if (auto* tx = dynamic_cast<cocos2d::ui::Text*>(toNode(L, 1))) {
+        // a one-line layout label stays on one line however long the text is (the Android client lets it overflow)
+        Size area = tx->getTextAreaSize();
+        if (area.height > 0 && area.height < tx->getFontSize() * 2) { tx->setTextAreaSize(Size::ZERO); tx->ignoreContentAdaptWithSize(true); }
+        tx->setString(t ? t : "");
+        return 0;
+    }
     if (auto* bt = dynamic_cast<cocos2d::ui::Button*>(toNode(L, 1))) { bt->setTitleText(t ? t : ""); return 0; }
     if (Label* l = labelOf(L)) {
         std::string raw = t ? t : "";
@@ -153,8 +159,32 @@ int setTextW(lua_State* L) { if (RichNode* r = richOf(L)) { r->setWidth(static_c
 int setTextH(lua_State* L) { if (Label* l = labelOf(L)) l->setDimensions(l->getDimensions().width, static_cast<float>(luaL_optnumber(L, 2, 0))); return 0; }
 int setFontSpacing(lua_State* L) { if (RichNode* r = richOf(L)) { r->setSpacing(static_cast<float>(luaL_optnumber(L, 2, 0))); return 0; } if (Label* l = labelOf(L)) l->setAdditionalKerning(static_cast<float>(luaL_optnumber(L, 2, 0))); return 0; }
 int setButtonTextColor(lua_State* L) {
+    if (Node* n = toNode(L, 1))
+        if (auto* l = dynamic_cast<Label*>(n->getChildByName("mc.buttontext")))
+            l->setTextColor(Color4B(static_cast<GLubyte>(luaL_checknumber(L, 2)), static_cast<GLubyte>(luaL_checknumber(L, 3)), static_cast<GLubyte>(luaL_checknumber(L, 4)), 255));
     if (auto* bt = dynamic_cast<cocos2d::ui::Button*>(toNode(L, 1)))
         bt->setTitleColor(Color3B(static_cast<GLubyte>(luaL_checknumber(L, 2)), static_cast<GLubyte>(luaL_checknumber(L, 3)), static_cast<GLubyte>(luaL_checknumber(L, 4))));
+    return 0;
+}
+const char* const kButtonText = "mc.buttontext";
+// ImageButton:SetButtonText(text [, font, size]): our image button is one sprite, the text is a label in its middle
+int setButtonText(lua_State* L) {
+    Node* n = toNode(L, 1);
+    if (auto* bt = dynamic_cast<cocos2d::ui::Button*>(n)) {
+        if (lua_isnumber(L, 4)) bt->setTitleFontSize(static_cast<float>(lua_tonumber(L, 4)));
+        return setString(L);
+    }
+    if (!dynamic_cast<Sprite*>(n) || richOf(L)) return setString(L);
+    const char* t = lua_tostring(L, 2);
+    auto* old = dynamic_cast<Label*>(n->getChildByName(kButtonText));
+    float size = static_cast<float>(luaL_optnumber(L, 4, old ? old->getTTFConfig().fontSize : 20));
+    Color4B colour = old ? old->getTextColor() : Color4B::WHITE;
+    if (old) old->removeFromParent();
+    Label* l = makeLabel(t ? t : "", size > 0 ? size : 20);
+    l->setName(kButtonText);
+    l->setTextColor(colour);
+    l->setPosition(n->getContentSize().width / 2, n->getContentSize().height / 2);
+    n->addChild(l, 1);
     return 0;
 }
 int removeNodeChild(lua_State* L) { Node* n = toNode(L, 1); Node* c = toNode(L, 2); if (n && c) n->removeChild(c, true); return 0; }
@@ -202,9 +232,9 @@ void addMethods(lua_State* L) {
         {"SetTextVertiacalAlign", setAlign}, {"SetPlaceHolderColor", setPlaceHolderColor}, {"SetMaxLength", setMaxLength},
         {"SetKeyBoardDidHideCallBack", noop}, {"SetKeyBoardDidShowCallBack", noop}, {"SetKeyBoardWillShowCallBack", noop},
         {"DetachWithIME", noop}, {"SetTextWidthAndHeight", setTextWH}, {"SetTextWidth", setTextW}, {"SetTextHeight", setTextH}, {"SetFontSpacing", setFontSpacing},
-        {"SetButtonTextColor", setButtonTextColor}, {"RemoveNode", removeNodeChild}, {"SetShadowColor", noop}, {"SetUpdate", noop},
+        {"SetButtonTextColor", setButtonTextColor}, {"RemoveNode", removeNodeChild}, 
         {"SetMansualUpdate", noop}, {"Destroy", noop}, {"SetTemplate", noop}, {"SetDisabledImage", noop}, {"ResetSize", noop},
-        {"DrawSolidTriangle", noop}, {"SetPlayeEndListener", noop}, {"SetPasswordMode", setPasswordMode}, {"SetButtonText", setString}, {"SetFilterWords", noop},
+        {"SetPlayeEndListener", noop}, {"SetPasswordMode", setPasswordMode}, {"SetButtonText", setButtonText}, {"SetFilterWords", noop},
     };
     for (const R& r : regs) { lua_pushcfunction(L, r.f); lua_setfield(L, -2, r.n); }
     lua_pop(L, 1);

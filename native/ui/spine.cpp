@@ -198,7 +198,10 @@ public:
         if (anim_ && spSkeletonData_findAnimation(data_, name.c_str())) anim_->setAnimation(track, name, loop);
     }
     void setListener(int id) { listener_ = id; listen(); }
-    void setSpeed(float v) { speed_ = v; if (anim_) anim_->getState()->timeScale = v; }
+    void setSpeed(float v) { speed_ = v; setRate(v); }
+    void setRate(float v) { rate_ = v; applyRate(); }               // current time scale (speed_ survives a skeleton swap)
+    // SetUpdate(false) holds the pose (skill cut-ins, battle pause); kept apart from pause(), which entering a scene undoes
+    void setFrozen(bool frozen) { frozen_ = frozen; applyRate(); }
 
     // the callbacks are posted to the next frame: they may delete the node. 2 = ANIMATION_COMPLETE, 3 = ANIMATION_EVENT
     void listen() {
@@ -236,10 +239,14 @@ private:
         skel_ = nullptr;
     }
     Skel* skel_ = nullptr;
+    void applyRate() { if (anim_) anim_->getState()->timeScale = frozen_ ? 0.0f : rate_; }
     void play() {
         if (!clip_.empty()) setClip(0, clip_, loop_);
-        anim_->getState()->timeScale = speed_;
+        rate_ = speed_;
+        applyRate();
     }
+    float rate_ = 1.0f;
+    bool frozen_ = false;
     spine::SkeletonAnimation* anim_ = nullptr;               // a child of this node
     spSkeletonData* data_ = nullptr;
     std::string clip_;
@@ -288,12 +295,16 @@ int getPlayAnimationName(lua_State* L) {
     lua_pushstring(L, t && t->animation ? t->animation->name : "");
     return 1;
 }
+// How long the current animation lasts (not how far it has played): footprints are spaced by half of the run cycle,
+// timed attacks stretch the animation over it.
 int getPlayAnimationTime(lua_State* L) {
     auto* n = sk(L);
     spTrackEntry* t = n ? n->getCurrent(0) : nullptr;
-    lua_pushnumber(L, t ? t->trackTime : 0);
+    lua_pushnumber(L, t && t->animation ? t->animation->duration : 0);
     return 1;
 }
+
+int setUpdate(lua_State* L) { if (auto* h = holder(L)) h->setFrozen(lua_toboolean(L, 2) == 0); return 0; }
 
 int setAnimationPlayTime(lua_State* L) {                 // SetAnimationPlayTime(name, totalSeconds): speed so the animation lasts that long
     auto* n = sk(L);
@@ -302,7 +313,7 @@ int setAnimationPlayTime(lua_State* L) {                 // SetAnimationPlayTime
     if (n && name && total > 0) {
         spTrackEntry* t = n->getCurrent(0);
         if (t && t->animation && std::strcmp(t->animation->name, name) == 0 && t->animation->duration > 0)
-            n->getState()->timeScale = static_cast<float>(t->animation->duration / total);
+            holder(L)->setRate(static_cast<float>(t->animation->duration / total));
     }
     return 0;
 }
@@ -371,7 +382,7 @@ void registerSpine(lua_State* L) {
         {"SetToSetupPose", setToSetupPose}, {"ResetSkeleton", resetSkeleton}, {"SetTimeScale", setTimeScale}, {"ResumeAnimation", resumeAnimation}, {"StopAnimation", stopAnimation},
         {"SetToPlayTime", setToPlayTime}, {"IsAnimationExist", isAnimationExist}, {"GetPlayAnimationName", getPlayAnimationName},
         {"GetPlayAnimationTime", getPlayAnimationTime},
-        {"SetAnimationPlayTime", setAnimationPlayTime},
+        {"SetAnimationPlayTime", setAnimationPlayTime}, {"SetUpdate", setUpdate},
     };
     for (const R& r : regs) { lua_pushcfunction(L, r.f); lua_setfield(L, -2, r.n); }
     lua_pop(L, 1);

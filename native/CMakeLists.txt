@@ -18,6 +18,7 @@ set(MC_SOURCES
   core/bundle.cpp core/host.cpp core/natives.cpp core/netbind.cpp core/net.cpp core/http.cpp core/rlog.cpp core/resmgr.cpp
   third_party/miniz/miniz.c ${LUA_SRC}
   ui/lua_node.cpp ui/images.cpp ui/text.cpp ui/scene.cpp ui/res.cpp ui/touch.cpp ui/actions.cpp ui/widgets.cpp ui/misc.cpp ui/spine.cpp ui/compat.cpp ui/rich_text.cpp
+  ui/particle_core.cpp ui/particle_node.cpp
   app/AppDelegate.cpp app/CrashReport.cpp
   ios/main.m ios/AppController.mm)
 

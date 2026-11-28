@@ -32,6 +32,7 @@ bool loadImage(cocos2d::Image* out, const cocos2d::Data& raw);   // any game ima
 cocos2d::Texture2D* textureFor(const std::string& path);
 void loadTextureAsync(const std::string& path, std::function<void()> done);   // decodes on a worker, done() on the main thread
 cocos2d::Texture2D* textureAs(const std::string& key, const std::string& path);   // decode path, register in the cache under key
+cocos2d::GLProgramState* brightState(float value);     // colours times value (compat.cpp); main thread
 void registerRes(lua_State* L);
 void purgeIdleSkeletons(double idleSeconds);            // spine.cpp; main thread, between frames
 

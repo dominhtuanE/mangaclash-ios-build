@@ -56,13 +56,8 @@ int SetAnchorPoint(lua_State* L) { self(L)->setAnchorPoint(Vec2(static_cast<floa
 int SetOpacity(lua_State* L) { self(L)->setOpacity(static_cast<GLubyte>(luaL_checknumber(L, 2))); return 0; }
 int setCascadeOpacityEnabled(lua_State* L) { self(L)->setCascadeOpacityEnabled(lua_toboolean(L, 2) != 0); return 0; }
 int setCascadeColorEnabled(lua_State* L) { self(L)->setCascadeColorEnabled(lua_toboolean(L, 2) != 0); return 0; }
-int GetContentSize(lua_State* L) {
-    Size s = self(L)->getContentSize();
-    lua_pushnumber(L, s.width);
-    lua_pushnumber(L, s.height);
-    return 2;
-}
-int GetSize(lua_State* L) {            // table form {width,height}
+// GetContentSize and GetSize both give a table {width,height}, as the Android engine does.
+int GetSize(lua_State* L) {
     Size s = self(L)->getContentSize();
     lua_createtable(L, 0, 2);
     lua_pushnumber(L, s.width); lua_setfield(L, -2, "width");
@@ -202,7 +197,7 @@ void registerNodes(lua_State* L) {
         {"SetScaleYFactor", SetScaleYFactor}, {"GetScaleXFactor", GetScaleXFactor}, {"GetScaleYFactor", GetScaleYFactor},
         {"SetRotation", SetRotation}, {"GetRotation", GetRotation}, {"SetZOrder", SetZOrder}, {"GetZOrder", GetZOrder},
         {"SetAnchorPoint", SetAnchorPoint}, {"SetOpacity", SetOpacity}, {"setCascadeOpacityEnabled", setCascadeOpacityEnabled},
-        {"setCascadeColorEnabled", setCascadeColorEnabled}, {"GetContentSize", GetContentSize}, {"GetContentWidth", GetContentWidth}, {"GetContentHeight", GetContentHeight}, {"GetSize", GetSize},
+        {"setCascadeColorEnabled", setCascadeColorEnabled}, {"GetContentSize", GetSize}, {"GetContentWidth", GetContentWidth}, {"GetContentHeight", GetContentHeight}, {"GetSize", GetSize},
         {"IsObjectActive", IsObjectActive}, {"AddChild", AddChild}, {"AddLayer", AddChild}, {"RemoveLayer", RemoveChild},
         {"SetContentSize", SetContentSize}, {"SetTag", SetTag}, {"GetTag", GetTag}, {"AddNode", AddNode}, {"RemoveChild", RemoveChild},
         {"RemoveSelf", RemoveSelf}, {"RemoveAllChild", RemoveAllChild}, {"DeleteMe", DeleteMe},
